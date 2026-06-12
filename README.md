@@ -1,4 +1,4 @@
-# MxSDR — Gerador de Material Comercial (SDR)
+# Maximos SDR — Gerador de Material Comercial (SDR)
 
 Ferramenta interna da **MAXIMOS Soluções Empresariais**. Funciona como uma
 "máscara" do prompt comercial: a SDR escolhe a empresa, clica em **Gerar** e

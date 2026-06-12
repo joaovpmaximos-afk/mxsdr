@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MxSDR · Gerador de Material Comercial — MAXIMOS</title>
+<title>Maximos SDR · Gerador de Material Comercial</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -833,7 +833,7 @@ tbody tr:hover { background: #fafbf8; }
 <div class="login" id="login">
   <div class="login-box">
     <div class="login-logo"><img id="logo-login" alt="MAXIMOS"></div>
-    <div class="login-title">Mx<em>SDR</em></div>
+    <div class="login-title">Maximos <em>SDR</em></div>
     <div class="login-sub">Gerador de Material Comercial · MAXIMOS Soluções Empresariais</div>
     <div class="login-bar"></div>
     <div class="login-q">Quem está usando?</div>
@@ -859,8 +859,8 @@ tbody tr:hover { background: #fafbf8; }
   <div class="sb-brand">
     <img id="logo-sb" alt="MAXIMOS">
     <div>
-      <div class="t">MxSDR</div>
-      <div class="s">Maximos</div>
+      <div class="t">Maximos SDR</div>
+      <div class="s">Comercial</div>
     </div>
   </div>
   <nav class="sb-nav">
@@ -888,7 +888,7 @@ tbody tr:hover { background: #fafbf8; }
       <div class="blk"><div class="n" id="st-emp">0</div><div class="l">Empresas</div></div>
       <div class="blk"><div class="n" id="st-ger">0</div><div class="l">Gerações/mês</div></div>
     </div>
-    <div class="sb-ver">MxSDR v1.0 · uso interno</div>
+    <div class="sb-ver">Maximos SDR v1.0 · uso interno</div>
   </div>
 </aside>
 
@@ -1202,7 +1202,7 @@ var LOGO = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJT
 
 var TEMPLATE_PADRAO = [
 '# PROMPT — Gerador de Material Comercial para SDR',
-'Prospecção B2B | Uso interno Máximos | Gerado em {{DATA_GERACAO}} via MxSDR',
+'Prospecção B2B | Uso interno Máximos | Gerado em {{DATA_GERACAO}} via Maximos SDR',
 '',
 '## OBJETIVO',
 'Você é um especialista em prospecção comercial B2B. Com base nos dados e documentos fornecidos, gere um pacote completo de materiais para SDR composto por:',
@@ -1494,7 +1494,7 @@ function go(p) {
   document.querySelectorAll('.nav-item').forEach(function (n) {
     n.classList.toggle('active', n.getAttribute('data-page') === p || (p === 'form' && n.getAttribute('data-page') === 'empresas'));
   });
-  document.getElementById('top-title').textContent = TITULOS[p] || 'MxSDR';
+  document.getElementById('top-title').textContent = TITULOS[p] || 'Maximos SDR';
   if (p === 'gerar') renderGerar();
   if (p === 'empresas') renderEmpresas();
   if (p === 'historico') renderHistorico();
@@ -2526,11 +2526,11 @@ function restaurarTemplate() {
 }
 function exportarBackup() {
   var dados = {
-    sistema: 'MxSDR', versao: 1, exportadoEm: new Date().toISOString(),
+    sistema: 'Maximos SDR', versao: 1, exportadoEm: new Date().toISOString(),
     empresas: empresas, sdrs: sdrs, historico: historico,
     template: lsGet('sdrmx_template', null)
   };
-  baixar('backup-mxsdr-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(dados, null, 2), 'application/json');
+  baixar('backup-maximos-sdr-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(dados, null, 2), 'application/json');
   toast('Backup exportado — guarde o arquivo na rede.');
 }
 function importarBackup(ev) {
@@ -2541,8 +2541,8 @@ function importarBackup(ev) {
   reader.onload = function (e) {
     try {
       var d = JSON.parse(e.target.result);
-      if (!d || d.sistema !== 'MxSDR' || !Array.isArray(d.empresas)) {
-        toast('Arquivo inválido — exporte o backup pelo próprio MxSDR.', true); return;
+      if (!d || (d.sistema !== 'Maximos SDR' && d.sistema !== 'MxSDR') || !Array.isArray(d.empresas)) {
+        toast('Arquivo inválido — exporte o backup pelo próprio Maximos SDR.', true); return;
       }
       if (!confirm('Importar backup de ' + (d.exportadoEm ? new Date(d.exportadoEm).toLocaleString('pt-BR') : 'data desconhecida') +
         '?\n\nEmpresas: ' + d.empresas.length + ' · Histórico: ' + (d.historico || []).length +
@@ -2578,18 +2578,18 @@ function exportarExcel() {
     ws['!cols'] = [36, 20, 10, 14, 14].map(function (w) { return { wch: w }; });
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Empresas');
-    XLSX.writeFile(wb, 'empresas-mxsdr-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+    XLSX.writeFile(wb, 'empresas-maximos-sdr-' + new Date().toISOString().slice(0, 10) + '.xlsx');
   } else {
     var heads = Object.keys(rows[0]);
     var csv = '﻿' + heads.join(';') + '\n' + rows.map(function (r) {
       return heads.map(function (h) { return '"' + String(r[h] || '').replace(/"/g, '""') + '"'; }).join(';');
     }).join('\n');
-    baixar('empresas-mxsdr.csv', csv, 'text/csv;charset=utf-8');
+    baixar('empresas-maximos-sdr.csv', csv, 'text/csv;charset=utf-8');
   }
   toast(empresas.length + ' empresa(s) exportada(s)!');
 }
 function apagarTudo() {
-  if (!confirm('APAGAR TODOS OS DADOS do MxSDR?\n\nEmpresas, histórico, equipe e modelo do prompt serão perdidos.')) return;
+  if (!confirm('APAGAR TODOS OS DADOS do Maximos SDR?\n\nEmpresas, histórico, equipe e modelo do prompt serão perdidos.')) return;
   if (!confirm('Tem certeza mesmo? Essa ação não tem volta.\n\nDica: exporte um backup antes.')) return;
   ['sdrmx_empresas', 'sdrmx_sdrs', 'sdrmx_historico', 'sdrmx_template', 'sdrmx_perfil'].forEach(function (k) {
     localStorage.removeItem(k);
@@ -2693,7 +2693,7 @@ function rodarTestes() {
     TEMPLATE_PADRAO.indexOf('{{EMPRESA}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{CNPJ}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{SDR}}') !== -1);
   var passou = res.filter(function (x) { return x.ok; }).length;
   var box = document.getElementById('teste-box');
-  box.innerHTML = '<h2>Autoteste MxSDR — ' + passou + '/' + res.length + ' passaram</h2>' +
+  box.innerHTML = '<h2>Autoteste Maximos SDR — ' + passou + '/' + res.length + ' passaram</h2>' +
     res.map(function (x) {
       return '<div class="' + (x.ok ? 'ok' : 'fail') + '">' + (x.ok ? '✓' : '✗') + ' ' + esc(x.nome) + '</div>';
     }).join('') +

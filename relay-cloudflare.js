@@ -1,15 +1,15 @@
 // ============================================================
-// MxSDR — RELAY (Cloudflare Worker)
+// Maximos SDR — RELAY (Cloudflare Worker)
 // Guarda a chave do Gemini EM SEGREDO. A equipe nunca vê a chave.
 // Passo a passo: veja o arquivo COMO-LIGAR-A-IA.txt
 // ------------------------------------------------------------
 // 1) Cole sua chave do Gemini entre as aspas de GEMINI_KEY abaixo.
-// 2) Deploy. Copie o endereço do worker e cole no MxSDR (Ajustes > Link do relay).
+// 2) Deploy. Copie o endereço do worker e cole no Maximos SDR (Ajustes > Link do relay).
 // ============================================================
 
 const GEMINI_KEY = "COLE_AQUI_SUA_CHAVE_DO_GEMINI";
 const MODELO = "gemini-2.5-flash";
-// Domínios autorizados a usar o relay (o site do MxSDR):
+// Domínios autorizados a usar o relay (o site do Maximos SDR):
 const ORIGENS_PERMITIDAS = ["https://joaovpmaximos-afk.github.io"];
 
 export default {
@@ -24,7 +24,7 @@ export default {
       "Vary": "Origin",
     };
     if (request.method === "OPTIONS") return new Response(null, { headers: cors });
-    if (request.method !== "POST") return new Response("MxSDR relay no ar :)", { headers: cors });
+    if (request.method !== "POST") return new Response("Maximos SDR relay no ar :)", { headers: cors });
     if (!permitido) return resp({ error: "origem nao autorizada" }, 403, cors);
 
     let body;

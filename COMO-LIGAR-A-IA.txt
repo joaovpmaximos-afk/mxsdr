@@ -1,4 +1,4 @@
-COMO LIGAR A IA DO MxSDR (uma vez só) — modo equipe
+COMO LIGAR A IA DO Maximos SDR (uma vez só) — modo equipe
 ====================================================
 Depois disto, a equipe SÓ abre o site, anexa os 2 arquivos e clica em gerar.
 Ninguém mais precisa de chave nem de configurar nada.
@@ -29,12 +29,12 @@ PARTE 2 — Criar o "relay" na Cloudflare (grátis)
         https://mxsdr-relay.SEUNOME.workers.dev )
 
 ------------------------------------------------------------
-PARTE 3 — Ligar no MxSDR
+PARTE 3 — Ligar no Maximos SDR
 ------------------------------------------------------------
 Opção A (mais fácil): mande esse endereço para o suporte do sistema, que ele
    deixa embutido no app — a equipe não vê nem precisa fazer nada.
 
-Opção B (você mesmo): no MxSDR, abra Ajustes -> IA -> campo "Link do relay",
+Opção B (você mesmo): no Maximos SDR, abra Ajustes -> IA -> campo "Link do relay",
    cole o endereço, clique em "Salvar" e depois em "Testar conexão".
    Tem que aparecer "Conexão OK".
 

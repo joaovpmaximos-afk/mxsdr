@@ -1639,11 +1639,16 @@ function baixarDoc(id) {
 /* RELAY_URL: quando preenchido, a equipe NÃO precisa de chave — o app usa este link
    central (um relay grátis que guarda a chave em segredo). Ligado uma vez pelo dono. */
 var RELAY_URL = '';
+/* EMBED_KEY_B64: chave central do escritório (Gemini), em base64 para não ficar "crua"
+   no código. Preenchida uma vez pelo suporte → toda a equipe usa sem configurar nada. */
+var EMBED_KEY_B64 = '';
 function getIA() { return lsGet('sdrmx_ai', { provider: 'gemini', key: '', model: '', relay: '' }); }
 function effectiveRelay() { var ia = getIA(); return ((ia.relay || '').trim()) || RELAY_URL; }
+function embedKey() { try { return EMBED_KEY_B64 ? atob(EMBED_KEY_B64) : ''; } catch (e) { return ''; } }
+function effectiveKey() { return (getIA().key || '').trim() || embedKey(); }
 function modeloPadrao(p) { return p === 'claude' ? 'claude-sonnet-4-6' : p === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash'; }
 function nomeProvedor(p) { return { gemini: 'Gemini', claude: 'Claude', openai: 'OpenAI' }[p] || p; }
-function iaConfigurada() { return !!(effectiveRelay() || (getIA().key && getIA().key.trim())); }
+function iaConfigurada() { return !!(effectiveRelay() || effectiveKey()); }
 function onProviderChange() {
   var p = document.getElementById('ai-provider').value;
   document.getElementById('ai-model').placeholder = modeloPadrao(p);
@@ -1669,13 +1674,16 @@ function salvarIA() {
 }
 function atualizaAiStatus() {
   var on = iaConfigurada(), relay = effectiveRelay(), ia = getIA();
+  var ownKey = (ia.key || '').trim();
+  var escritorio = !relay && !ownKey && !!embedKey();
   var txt = !on ? 'IA não configurada — vá em Ajustes'
     : relay ? 'IA pronta · modo equipe (relay)'
+    : escritorio ? 'IA pronta · chave do escritório'
     : ('IA: ' + nomeProvedor(ia.provider) + ' · ' + (ia.model || modeloPadrao(ia.provider)));
   var s = document.getElementById('ai-status'), t = document.getElementById('ai-status-txt');
   if (s) { s.className = 'ai-status ' + (on ? 'on' : 'off'); t.textContent = txt; }
   var s2 = document.getElementById('aj-ai-status'), t2 = document.getElementById('aj-ai-status-txt');
-  if (s2) { s2.className = 'ai-status ' + (on ? 'on' : 'off'); t2.textContent = on ? (relay ? 'Modo equipe (relay) ✓' : 'Configurada ✓') : 'Sem chave/relay'; }
+  if (s2) { s2.className = 'ai-status ' + (on ? 'on' : 'off'); t2.textContent = on ? (relay ? 'Modo equipe (relay) ✓' : escritorio ? 'Chave do escritório ✓' : 'Configurada ✓') : 'Sem chave/relay'; }
 }
 function testarIA() {
   if (!iaConfigurada()) { toast('Configure a chave ou o link do relay e clique em Salvar.', true); return; }
@@ -1704,22 +1712,25 @@ async function callAI(promptText) {
   var relay = effectiveRelay();
   if (relay) return await callRelay(relay, promptText);
   var ia = getIA();
-  var model = ia.model || modeloPadrao(ia.provider);
-  if (!ia.key) throw new Error('chave de API não configurada');
-  if (ia.provider === 'claude') {
+  var key = (ia.key || '').trim();
+  var provider = ia.provider || 'gemini';
+  if (!key && embedKey()) { key = embedKey(); provider = 'gemini'; }   // chave central do escritório
+  if (!key) throw new Error('IA não configurada (sem chave nem relay)');
+  var model = ia.model || modeloPadrao(provider);
+  if (provider === 'claude') {
     var r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': ia.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({ model: model, max_tokens: 8192, messages: [{ role: 'user', content: promptText }] })
     });
     var d = await r.json();
     if (!r.ok) throw new Error((d.error && d.error.message) || ('HTTP ' + r.status));
     return (d.content || []).map(function (c) { return c.text || ''; }).join('');
   }
-  if (ia.provider === 'openai') {
+  if (provider === 'openai') {
     var r2 = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'Authorization': 'Bearer ' + ia.key },
+      headers: { 'content-type': 'application/json', 'Authorization': 'Bearer ' + key },
       body: JSON.stringify({ model: model, temperature: 0.6, messages: [{ role: 'user', content: promptText }] })
     });
     var d2 = await r2.json();
@@ -1727,7 +1738,7 @@ async function callAI(promptText) {
     return d2.choices[0].message.content;
   }
   // gemini (padrão)
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(ia.key);
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key);
   var r3 = await fetch(url, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: promptText }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 8192 } })

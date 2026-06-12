@@ -936,97 +936,24 @@ tbody tr:hover { background: #fafbf8; }
       <div class="page-head">
         <div>
           <h2 id="form-title">Nova empresa</h2>
-          <div class="sub">Estes dados alimentam o prompt. Quanto mais completo, melhor o material que a IA devolve.</div>
+          <div class="sub">A empresa é só um atalho para gerar o material. Os detalhes a IA extrai do portfólio e da ata que você anexa na hora de gerar.</div>
         </div>
-        <span class="badge bg-gray" id="form-comp-badge">0% completo</span>
       </div>
 
       <div class="card card-pad">
-        <div class="fsec">
+        <div class="fsec" style="margin-bottom:2px">
           <div class="fsec-t"><span class="num">1</span> Identificação <span class="ln"></span></div>
           <div class="form-grid">
             <div class="full">
               <label class="fl">Nome da empresa <b>*</b></label>
-              <input type="text" id="f-nome" placeholder="Ex.: Acme Manutenção Industrial Ltda" oninput="atualizaCompBadge()">
+              <input type="text" id="f-nome" placeholder="Ex.: Hidrabol Serviços Industriais">
             </div>
             <div>
-              <label class="fl">Ano de fundação</label>
-              <input type="number" id="f-ano" placeholder="Ex.: 2008" min="1900" max="2100" oninput="atualizaCompBadge()">
-            </div>
-            <div>
-              <label class="fl">Cidade / Região de atuação <b>*</b></label>
-              <input type="text" id="f-cidade" placeholder="Ex.: Limeira e região de Campinas/SP" oninput="atualizaCompBadge()">
-            </div>
-            <div>
-              <label class="fl">Segmento alvo <b>*</b></label>
-              <input type="text" id="f-segmento" placeholder="Ex.: Indústrias de médio e grande porte" oninput="atualizaCompBadge()">
-            </div>
-            <div>
-              <label class="fl">Setor do decisor <b>*</b></label>
-              <select id="f-setor" onchange="toggleSetorOutro();atualizaCompBadge()">
-                <option value="">Selecione…</option>
-                <option>Compras</option>
-                <option>Suprimentos</option>
-                <option>RH</option>
-                <option>Gerência de Manutenção</option>
-                <option value="__outro">Outro…</option>
-              </select>
-              <input type="text" id="f-setor-outro" placeholder="Digite o setor" style="margin-top:8px;display:none" oninput="atualizaCompBadge()">
+              <label class="fl">CNPJ <span style="color:var(--ink3);font-weight:400">(opcional)</span></label>
+              <input type="text" id="f-cnpj" placeholder="00.000.000/0001-00" maxlength="18" inputmode="numeric" oninput="maskCNPJ(this)">
             </div>
           </div>
-        </div>
-
-        <div class="fsec">
-          <div class="fsec-t"><span class="num">2</span> Serviços principais <span class="ln"></span> <span class="count-chip" id="serv-count">0 de 4–7</span></div>
-          <div id="serv-rows"></div>
-          <button class="btn btn-sm" onclick="addServico()">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-            Adicionar serviço
-          </button>
-          <div class="hint">O prompt pede de 4 a 7 serviços, cada um com descrição curta.</div>
-        </div>
-
-        <div class="fsec">
-          <div class="fsec-t"><span class="num">3</span> Posicionamento <span class="ln"></span></div>
-          <div class="form-grid">
-            <div class="full">
-              <label class="fl">Diferenciais competitivos</label>
-              <textarea id="f-diferenciais" placeholder="Ex.: equipe própria treinada, atendimento 24h, resposta em até 2h, gestão completa do contrato…" oninput="atualizaCompBadge()"></textarea>
-            </div>
-            <div>
-              <label class="fl">Certificações ou normas atendidas</label>
-              <input type="text" id="f-certificacoes" placeholder="Ex.: ISO 9001, NR-10, NR-35" oninput="atualizaCompBadge()">
-            </div>
-            <div>
-              <label class="fl">Principais clientes ou parceiros <span class="count-chip" id="cli-count" style="margin-left:6px">0 de 2–5</span></label>
-              <div class="chips" id="cli-chips" onclick="document.getElementById('cli-input').focus()">
-                <input type="text" id="cli-input" placeholder="Digite e aperte Enter" onkeydown="cliKey(event)" onblur="cliAdd()">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="fsec">
-          <div class="fsec-t"><span class="num">4</span> Contato da empresa <span class="ln"></span></div>
-          <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
-            <div>
-              <label class="fl">Responsável</label>
-              <input type="text" id="f-resp" placeholder="Ex.: Carlos Pereira" oninput="atualizaCompBadge()">
-            </div>
-            <div>
-              <label class="fl">Telefone</label>
-              <input type="text" id="f-tel" placeholder="(19) 99999-9999" oninput="atualizaCompBadge()">
-            </div>
-            <div>
-              <label class="fl">E-mail</label>
-              <input type="email" id="f-email" placeholder="contato@empresa.com.br" oninput="atualizaCompBadge()">
-            </div>
-          </div>
-        </div>
-
-        <div class="fsec" style="margin-bottom:6px">
-          <div class="fsec-t"><span class="num">5</span> Observações internas <span class="ln"></span></div>
-          <textarea id="f-obs" placeholder="Anotações livres da equipe (não entram no prompt)."></textarea>
+          <div class="hint" style="margin-top:14px">Pronto — é só isso. Na hora de <b>gerar</b>, você anexa o <b>portfólio</b> e a <b>ata</b> na IA, e ela monta o material a partir desses arquivos.</div>
         </div>
       </div>
 
@@ -1171,17 +1098,10 @@ var TEMPLATE_PADRAO = [
 '',
 '## DADOS DE ENTRADA',
 '- Nome da empresa: {{EMPRESA}}',
-'- Ano de fundação: {{ANO_FUNDACAO}}',
-'- Cidade / Região de atuação: {{CIDADE}}',
-'- Serviços principais:',
-'{{SERVICOS}}',
-'- Segmento alvo: {{SEGMENTO_ALVO}}',
-'- Setor do decisor: {{SETOR_DECISOR}}',
-'- Diferenciais competitivos: {{DIFERENCIAIS}}',
-'- Certificações ou normas atendidas: {{CERTIFICACOES}}',
-'- Principais clientes ou parceiros: {{CLIENTES}}',
+'- CNPJ: {{CNPJ}}',
 '- Nome do SDR: {{SDR}}',
-'- Contatos da empresa: {{CONTATOS}}',
+'',
+'Os demais dados da empresa — ano de fundação e tempo de mercado, cidade/região de atuação, serviços principais (com descrição curta de cada), segmento-alvo, setor do decisor, diferenciais competitivos, certificações/normas atendidas, principais clientes/parceiros e contatos (telefone, e-mail, endereço) — devem ser EXTRAÍDOS dos documentos anexados a esta conversa: o PORTFÓLIO da empresa e a ATA da reunião. Use somente informações presentes nos anexos; não invente dados. Se algum item não constar nos documentos, omita-o com naturalidade em vez de escrever "não informado".',
 '',
 '## REGRAS FIXAS — nunca ignore',
 '1. O decisor alvo é sempre o Comprador. Perguntas diretas e objetivas sobre demanda, volume e prazo. Nunca subjetivas.',
@@ -1266,25 +1186,9 @@ var TEMPLATE_PADRAO = [
 var PLACEHOLDERS = {
   EMPRESA: 'Nome da empresa',
   EMPRESA_UPPER: 'Nome em maiúsculas',
-  ANO_FUNDACAO: 'Ano de fundação (+ idade)',
-  CIDADE: 'Cidade / região',
-  SERVICOS: 'Lista de serviços',
-  SERVICOS_INLINE: 'Serviços em linha',
-  SEGMENTO_ALVO: 'Segmento alvo',
-  SETOR_DECISOR: 'Setor do decisor',
-  DIFERENCIAIS: 'Diferenciais',
-  CERTIFICACOES: 'Certificações',
-  CLIENTES: 'Clientes / parceiros',
+  CNPJ: 'CNPJ',
   SDR: 'Nome da SDR',
-  CONTATOS: 'Contatos da empresa',
   DATA_GERACAO: 'Data de hoje'
-};
-
-var ROTULO_CAMPO = {
-  EMPRESA: 'Nome da empresa', ANO_FUNDACAO: 'Ano de fundação', CIDADE: 'Cidade/região',
-  SERVICOS: 'Serviços', SERVICOS_INLINE: 'Serviços', SEGMENTO_ALVO: 'Segmento alvo',
-  SETOR_DECISOR: 'Setor do decisor', DIFERENCIAIS: 'Diferenciais', CERTIFICACOES: 'Certificações',
-  CLIENTES: 'Clientes/parceiros', SDR: 'Nome da SDR', CONTATOS: 'Contatos', EMPRESA_UPPER: 'Nome da empresa'
 };
 
 var CORES_AVATAR = ['#049c74','#0b7e63','#147a8c','#2c5e50','#0a8a52','#3c6e63','#1d6b58','#0f8f7a'];
@@ -1303,8 +1207,6 @@ var historico = lsGet('sdrmx_historico', []);
 var perfilId  = lsGet('sdrmx_perfil', null);
 
 var editingId = null;
-var formServicos = [];
-var formClientes = [];
 var gerarEmpresaId = null;
 var paginaAtual = 'gerar';
 
@@ -1378,57 +1280,17 @@ function slug(s) {
 }
 
 /* ════════════════════════ COMPLETUDE ════════════════════════ */
-function completude(e) {
-  var checks = [
-    !!(e.nome && e.nome.trim()),
-    !!(e.cidade && e.cidade.trim()),
-    !!(e.segmentoAlvo && e.segmentoAlvo.trim()),
-    !!(e.setorDecisor && e.setorDecisor.trim()),
-    (e.servicos || []).filter(function (s) { return s.nome && s.nome.trim(); }).length >= 4,
-    !!(e.anoFundacao),
-    !!(e.diferenciais && e.diferenciais.trim()),
-    !!(e.certificacoes && e.certificacoes.trim()),
-    (e.clientes || []).length >= 2,
-    !!((e.contatoResponsavel && e.contatoResponsavel.trim()) || (e.contatoTel && e.contatoTel.trim()) || (e.contatoEmail && e.contatoEmail.trim()))
-  ];
-  var ok = checks.filter(Boolean).length;
-  return Math.round(ok / checks.length * 100);
-}
-
 /* ════════════════════════ TEMPLATE / GERAÇÃO ════════════════════════ */
 function templateAtual() {
   var t = lsGet('sdrmx_template', null);
   return (typeof t === 'string' && t.trim()) ? t : TEMPLATE_PADRAO;
 }
 function dadosPrompt(emp, sdrNome) {
-  var servOk = (emp.servicos || []).filter(function (s) { return s.nome && s.nome.trim(); });
-  var servBlock = servOk.map(function (s) {
-    return '  - ' + s.nome.trim() + (s.desc && s.desc.trim() ? ': ' + s.desc.trim() : '');
-  }).join('\n');
-  var contatos = [
-    emp.contatoResponsavel && emp.contatoResponsavel.trim() ? 'Responsável: ' + emp.contatoResponsavel.trim() : null,
-    emp.contatoTel && emp.contatoTel.trim() ? 'Telefone: ' + emp.contatoTel.trim() : null,
-    emp.contatoEmail && emp.contatoEmail.trim() ? 'E-mail: ' + emp.contatoEmail.trim() : null
-  ].filter(Boolean).join(' · ');
-  var ano = '';
-  if (emp.anoFundacao) {
-    var idade = new Date().getFullYear() - parseInt(emp.anoFundacao, 10);
-    ano = String(emp.anoFundacao) + (idade >= 0 && idade < 200 ? ' (' + idade + ' anos de mercado)' : '');
-  }
   return {
     EMPRESA: (emp.nome || '').trim(),
     EMPRESA_UPPER: (emp.nome || '').trim().toUpperCase(),
-    ANO_FUNDACAO: ano,
-    CIDADE: (emp.cidade || '').trim(),
-    SERVICOS: servBlock,
-    SERVICOS_INLINE: servOk.map(function (s) { return s.nome.trim(); }).join(' / '),
-    SEGMENTO_ALVO: (emp.segmentoAlvo || '').trim(),
-    SETOR_DECISOR: (emp.setorDecisor || '').trim(),
-    DIFERENCIAIS: (emp.diferenciais || '').trim(),
-    CERTIFICACOES: (emp.certificacoes || '').trim(),
-    CLIENTES: (emp.clientes || []).join(', '),
+    CNPJ: (emp.cnpj || '').trim() || 'não informado',
     SDR: (sdrNome || '').trim(),
-    CONTATOS: contatos,
     DATA_GERACAO: new Date().toLocaleDateString('pt-BR')
   };
 }
@@ -1554,7 +1416,7 @@ function renderEmpPick() {
   var list = document.getElementById('emp-pick-list');
   var vazio = document.getElementById('gerar-vazio');
   var filtradas = empresas.filter(function (e) {
-    return !q || [e.nome, e.cidade, e.segmentoAlvo].join(' ').toLowerCase().indexOf(q) !== -1;
+    return !q || [e.nome, e.cnpj].join(' ').toLowerCase().indexOf(q) !== -1;
   });
   document.getElementById('emp-pick-count').textContent = empresas.length ? (filtradas.length + ' de ' + empresas.length) : '';
   if (!empresas.length) {
@@ -1567,12 +1429,11 @@ function renderEmpPick() {
     vazio.style.display = 'none';
     if (gerarEmpresaId && !empresas.find(function (e) { return e.id === gerarEmpresaId; })) gerarEmpresaId = null;
     list.innerHTML = filtradas.map(function (e) {
-      var pct = completude(e);
+      var gers = historico.filter(function (h) { return h.empresaId === e.id; }).length;
       return '<div class="emp-pick' + (e.id === gerarEmpresaId ? ' sel' : '') + '" onclick="selEmpresa(\'' + e.id + '\')">' +
         '<span class="check"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>' +
         '<div class="nm">' + esc(e.nome) + '</div>' +
-        '<div class="seg">' + esc([e.segmentoAlvo, e.cidade].filter(Boolean).join(' · ') || '—') + '</div>' +
-        '<div class="meta"><span class="comp-bar' + (pct < 70 ? ' warn' : '') + '"><i style="width:' + pct + '%"></i></span><span class="comp-pct">' + pct + '%</span></div>' +
+        '<div class="seg">' + esc(e.cnpj ? e.cnpj : 'sem CNPJ') + (gers ? ' · ' + gers + ' geração' + (gers === 1 ? '' : 'ões') : '') + '</div>' +
         '</div>';
     }).join('') || '<div class="hint" style="padding:14px 4px">Nenhuma empresa encontrada para essa busca.</div>';
   }
@@ -1607,14 +1468,12 @@ function gerarMaterial() {
 }
 function renderDocumento(item, faltando) {
   var area = document.getElementById('doc-area');
-  var warns = (faltando || []).map(function (k) { return ROTULO_CAMPO[k] || k; })
-    .filter(function (v, i, a) { return a.indexOf(v) === i; });
   area.innerHTML =
     '<div class="doc-wrap" id="doc-atual">' +
       '<div class="doc-head">' +
         '<div><div class="t">Prompt pronto — ' + esc(item.empresaNome) + '</div>' +
         '<div class="m">Gerado por ' + esc(item.sdr || '—') + ' · ' + dataFmt(item.ts) + ' · salvo no histórico</div></div>' +
-        '<span class="badge ' + (warns.length ? 'bg-amber' : 'bg-green') + '">' + (warns.length ? warns.length + ' campo(s) sem preencher' : 'Dados completos ✓') + '</span>' +
+        '<span class="badge bg-amber">Anexe portfólio + ata na IA</span>' +
       '</div>' +
       '<div class="sheet">' +
         '<div class="sheet-id">' +
@@ -1623,7 +1482,7 @@ function renderDocumento(item, faltando) {
           '<div class="b">Prompt para IA · uso interno</div></div>' +
           '<div class="right">' + esc(item.empresaNome) + '<br>' + dataFmt(item.ts) + '</div>' +
         '</div>' +
-        (warns.length ? '<div class="warn-box"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg><div>O prompt sai com <b>(não informado)</b> em: ' + esc(warns.join(', ')) + '. Você pode gerar assim mesmo, ou <a href="javascript:void(0)" style="color:inherit;font-weight:600" onclick="editarEmpresa(\'' + item.empresaId + '\')">completar o cadastro</a>.</div></div>' : '') +
+        '<div class="warn-box"><svg viewBox="0 0 24 24"><path d="M12 16v-4M12 8h.01M22 12a10 10 0 11-20 0 10 10 0 0120 0z"/></svg><div>Cole este prompt na IA (Claude ou ChatGPT) e <b>anexe o portfólio + a ata da reunião</b>. A IA preenche os dados da empresa a partir desses arquivos e devolve os 2 documentos.</div></div>' +
         '<pre>' + highlightPrompt(item.txt) + '</pre>' +
         '<div class="doc-actions">' +
           '<button class="btn btn-pri" id="btn-copiar" onclick="copiarGeracao(\'' + item.id + '\', this)">' +
@@ -1687,28 +1546,23 @@ function renderEmpresas() {
   var grid = document.getElementById('emp-grid');
   var vazio = document.getElementById('emp-vazio');
   var arr = empresas.filter(function (e) {
-    return !q || [e.nome, e.cidade, e.segmentoAlvo, e.certificacoes].join(' ').toLowerCase().indexOf(q) !== -1;
+    return !q || [e.nome, e.cnpj].join(' ').toLowerCase().indexOf(q) !== -1;
   });
   if (!empresas.length) {
     grid.innerHTML = ''; vazio.style.display = 'block'; return;
   }
   vazio.style.display = 'none';
   grid.innerHTML = arr.map(function (e) {
-    var pct = completude(e);
-    var nServ = (e.servicos || []).filter(function (s) { return s.nome && s.nome.trim(); }).length;
     var gers = historico.filter(function (h) { return h.empresaId === e.id; }).length;
     return '<div class="emp-card">' +
       '<div class="top">' +
         '<span class="emp-ic" style="background:' + corAvatar(e.nome) + '">' + esc(iniciais(e.nome)) + '</span>' +
         '<div><div class="nm">' + esc(e.nome) + '</div>' +
-        '<div class="ct">' + esc([e.cidade, e.anoFundacao ? 'desde ' + e.anoFundacao : ''].filter(Boolean).join(' · ') || '—') + '</div></div>' +
+        '<div class="ct td-mono" style="font-size:11.5px">' + esc(e.cnpj ? e.cnpj : 'sem CNPJ') + '</div></div>' +
       '</div>' +
       '<div class="tags">' +
-        (e.segmentoAlvo ? '<span class="badge bg-gray">' + esc(e.segmentoAlvo) + '</span>' : '') +
-        '<span class="badge ' + (nServ >= 4 ? 'bg-green' : 'bg-amber') + '">' + nServ + ' serviço' + (nServ === 1 ? '' : 's') + '</span>' +
-        (gers ? '<span class="badge bg-blue">' + gers + ' geração' + (gers === 1 ? '' : 'ões') + '</span>' : '') +
+        (gers ? '<span class="badge bg-blue">' + gers + ' geração' + (gers === 1 ? '' : 'ões') + '</span>' : '<span class="badge bg-gray">sem gerações</span>') +
       '</div>' +
-      '<div class="meta2"><span class="comp-bar' + (pct < 70 ? ' warn' : '') + '"><i style="width:' + pct + '%"></i></span><span class="lbl2">' + pct + '% completo</span></div>' +
       '<div class="acts">' +
         '<button class="btn btn-pri btn-sm" onclick="gerarCom(\'' + e.id + '\')">' +
           '<svg viewBox="0 0 24 24"><path d="M13 2L4.5 13.5h6L10 22l8.5-11.5h-6L13 2z"/></svg>Gerar</button>' +
@@ -1739,159 +1593,43 @@ function excluirEmpresa(id) {
 /* ════════════════════════ FORMULÁRIO ════════════════════════ */
 function novaEmpresa() {
   editingId = null;
-  formServicos = [{ nome: '', desc: '' }, { nome: '', desc: '' }, { nome: '', desc: '' }, { nome: '', desc: '' }];
-  formClientes = [];
   document.getElementById('form-title').textContent = 'Nova empresa';
   document.getElementById('form-save-lbl').textContent = 'Salvar empresa';
   document.getElementById('form-del').style.display = 'none';
-  ['f-nome', 'f-ano', 'f-cidade', 'f-segmento', 'f-setor-outro', 'f-diferenciais', 'f-certificacoes', 'f-resp', 'f-tel', 'f-email', 'f-obs'].forEach(function (id) {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('f-setor').value = '';
-  toggleSetorOutro();
-  renderServRows();
-  renderCliChips();
-  atualizaCompBadge();
+  document.getElementById('f-nome').value = '';
+  document.getElementById('f-cnpj').value = '';
   go('form');
+  setTimeout(function () { document.getElementById('f-nome').focus(); }, 60);
 }
 function editarEmpresa(id) {
   var e = empresas.find(function (x) { return x.id === id; });
   if (!e) return;
   fecharModal();
   editingId = id;
-  formServicos = (e.servicos && e.servicos.length ? e.servicos : [{ nome: '', desc: '' }]).map(function (s) {
-    return { nome: s.nome || '', desc: s.desc || '' };
-  });
-  while (formServicos.length < 4) formServicos.push({ nome: '', desc: '' });
-  formClientes = (e.clientes || []).slice();
   document.getElementById('form-title').textContent = 'Editar — ' + e.nome;
   document.getElementById('form-save-lbl').textContent = 'Salvar alterações';
   document.getElementById('form-del').style.display = 'inline-flex';
   document.getElementById('f-nome').value = e.nome || '';
-  document.getElementById('f-ano').value = e.anoFundacao || '';
-  document.getElementById('f-cidade').value = e.cidade || '';
-  document.getElementById('f-segmento').value = e.segmentoAlvo || '';
-  var setorSel = document.getElementById('f-setor');
-  var padroes = ['Compras', 'Suprimentos', 'RH', 'Gerência de Manutenção'];
-  if (e.setorDecisor && padroes.indexOf(e.setorDecisor) === -1) {
-    setorSel.value = '__outro';
-    document.getElementById('f-setor-outro').value = e.setorDecisor;
-  } else {
-    setorSel.value = e.setorDecisor || '';
-    document.getElementById('f-setor-outro').value = '';
-  }
-  toggleSetorOutro();
-  document.getElementById('f-diferenciais').value = e.diferenciais || '';
-  document.getElementById('f-certificacoes').value = e.certificacoes || '';
-  document.getElementById('f-resp').value = e.contatoResponsavel || '';
-  document.getElementById('f-tel').value = e.contatoTel || '';
-  document.getElementById('f-email').value = e.contatoEmail || '';
-  document.getElementById('f-obs').value = e.obs || '';
-  renderServRows();
-  renderCliChips();
-  atualizaCompBadge();
+  document.getElementById('f-cnpj').value = e.cnpj || '';
   go('form');
 }
-function toggleSetorOutro() {
-  var v = document.getElementById('f-setor').value;
-  document.getElementById('f-setor-outro').style.display = (v === '__outro') ? 'block' : 'none';
-}
-function renderServRows() {
-  var box = document.getElementById('serv-rows');
-  box.innerHTML = formServicos.map(function (s, i) {
-    return '<div class="serv-row">' +
-      '<input type="text" placeholder="Serviço ' + (i + 1) + '" value="' + esc(s.nome) + '" oninput="formServicos[' + i + '].nome=this.value;servCount()">' +
-      '<input type="text" placeholder="Descrição curta (1 linha)" value="' + esc(s.desc) + '" oninput="formServicos[' + i + '].desc=this.value">' +
-      '<button class="del" title="Remover" onclick="delServico(' + i + ')">✕</button>' +
-    '</div>';
-  }).join('');
-  servCount();
-}
-function addServico() {
-  if (formServicos.length >= 10) { toast('Máximo de 10 serviços.', true); return; }
-  formServicos.push({ nome: '', desc: '' });
-  renderServRows();
-  var rows = document.querySelectorAll('#serv-rows .serv-row input');
-  if (rows.length) rows[rows.length - 2].focus();
-}
-function delServico(i) {
-  formServicos.splice(i, 1);
-  if (!formServicos.length) formServicos.push({ nome: '', desc: '' });
-  renderServRows();
-  atualizaCompBadge();
-}
-function servCount() {
-  var n = formServicos.filter(function (s) { return s.nome && s.nome.trim(); }).length;
-  var chip = document.getElementById('serv-count');
-  chip.textContent = n + ' de 4–7';
-  chip.className = 'count-chip ' + (n >= 4 && n <= 7 ? 'ok' : (n > 0 ? 'warn' : ''));
-  atualizaCompBadge();
-}
-function cliKey(ev) {
-  if (ev.key === 'Enter' || ev.key === ',') { ev.preventDefault(); cliAdd(); }
-  else if (ev.key === 'Backspace' && !ev.target.value && formClientes.length) {
-    formClientes.pop(); renderCliChips();
-  }
-}
-function cliAdd() {
-  var inp = document.getElementById('cli-input');
-  var v = inp.value.replace(/,/g, ' ').trim();
-  if (!v) return;
-  if (formClientes.length >= 8) { toast('Máximo de 8 clientes.', true); inp.value = ''; return; }
-  if (formClientes.indexOf(v) === -1) formClientes.push(v);
-  inp.value = '';
-  renderCliChips();
-}
-function delCli(i) {
-  formClientes.splice(i, 1);
-  renderCliChips();
-}
-function renderCliChips() {
-  var box = document.getElementById('cli-chips');
-  var inp = document.getElementById('cli-input');
-  box.querySelectorAll('.chip').forEach(function (c) { c.remove(); });
-  formClientes.forEach(function (c, i) {
-    var el = document.createElement('span');
-    el.className = 'chip';
-    el.innerHTML = esc(c) + '<button onclick="delCli(' + i + ')" title="Remover">✕</button>';
-    box.insertBefore(el, inp);
-  });
-  var chip = document.getElementById('cli-count');
-  chip.textContent = formClientes.length + ' de 2–5';
-  chip.className = 'count-chip ' + (formClientes.length >= 2 && formClientes.length <= 5 ? 'ok' : (formClientes.length ? 'warn' : ''));
-  atualizaCompBadge();
+function maskCNPJ(input) {
+  var v = input.value.replace(/\D/g, '').slice(0, 14);
+  v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+  v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+  v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+  v = v.replace(/(\d{4})(\d)/, '$1-$2');
+  input.value = v;
 }
 function empDoForm() {
-  var setorSel = document.getElementById('f-setor').value;
-  var setor = setorSel === '__outro' ? document.getElementById('f-setor-outro').value.trim() : setorSel;
   return {
     id: editingId || uid(),
     nome: document.getElementById('f-nome').value.trim(),
-    anoFundacao: document.getElementById('f-ano').value.trim(),
-    cidade: document.getElementById('f-cidade').value.trim(),
-    segmentoAlvo: document.getElementById('f-segmento').value.trim(),
-    setorDecisor: setor,
-    servicos: formServicos.map(function (s) { return { nome: (s.nome || '').trim(), desc: (s.desc || '').trim() }; })
-      .filter(function (s) { return s.nome; }),
-    diferenciais: document.getElementById('f-diferenciais').value.trim(),
-    certificacoes: document.getElementById('f-certificacoes').value.trim(),
-    clientes: formClientes.slice(),
-    contatoResponsavel: document.getElementById('f-resp').value.trim(),
-    contatoTel: document.getElementById('f-tel').value.trim(),
-    contatoEmail: document.getElementById('f-email').value.trim(),
-    obs: document.getElementById('f-obs').value.trim(),
+    cnpj: document.getElementById('f-cnpj').value.trim(),
     updatedAt: new Date().toISOString()
   };
 }
-function atualizaCompBadge() {
-  var e = empDoForm();
-  var pct = completude(e);
-  var b = document.getElementById('form-comp-badge');
-  b.textContent = pct + '% completo';
-  b.className = 'badge ' + (pct >= 80 ? 'bg-green' : pct >= 50 ? 'bg-amber' : 'bg-gray');
-}
 function salvarEmpresa() {
-  cliAdd();
   var obj = empDoForm();
   if (!obj.nome) { toast('O nome da empresa é obrigatório.', true); document.getElementById('f-nome').focus(); return; }
   if (editingId) {
@@ -1903,9 +1641,7 @@ function salvarEmpresa() {
   }
   saveEmpresas();
   atualizaSidebarStats();
-  var nServ = obj.servicos.length;
-  if (nServ < 4) toast('Salvo! Dica: o prompt pede de 4 a 7 serviços (tem ' + nServ + ').', true);
-  else toast(editingId ? 'Empresa atualizada!' : 'Empresa cadastrada!');
+  toast(editingId ? 'Empresa atualizada!' : 'Empresa cadastrada!');
   editingId = null;
   go('empresas');
 }
@@ -2040,7 +1776,7 @@ function salvarTemplate() {
   var v = document.getElementById('tpl-edit').value;
   if (!v.trim()) { toast('O modelo não pode ficar vazio.', true); return; }
   var avisos = [];
-  ['EMPRESA', 'SERVICOS', 'SDR'].forEach(function (k) {
+  ['EMPRESA', 'CNPJ', 'SDR'].forEach(function (k) {
     if (v.indexOf('{{' + k + '}}') === -1) avisos.push('{{' + k + '}}');
   });
   lsSet('sdrmx_template', v);
@@ -2095,18 +1831,16 @@ function exportarExcel() {
   if (!empresas.length) { toast('Nenhuma empresa para exportar.', true); return; }
   var rows = empresas.map(function (e) {
     return {
-      'Empresa': e.nome, 'Ano fundação': e.anoFundacao, 'Cidade/Região': e.cidade,
-      'Segmento alvo': e.segmentoAlvo, 'Setor decisor': e.setorDecisor,
-      'Serviços': (e.servicos || []).map(function (s) { return s.nome + (s.desc ? ': ' + s.desc : ''); }).join(' | '),
-      'Diferenciais': e.diferenciais, 'Certificações': e.certificacoes,
-      'Clientes/Parceiros': (e.clientes || []).join(', '),
-      'Responsável': e.contatoResponsavel, 'Telefone': e.contatoTel, 'E-mail': e.contatoEmail,
-      'Observações': e.obs, 'Atualizada em': e.updatedAt ? new Date(e.updatedAt).toLocaleDateString('pt-BR') : ''
+      'Empresa': e.nome,
+      'CNPJ': e.cnpj || '',
+      'Gerações': historico.filter(function (h) { return h.empresaId === e.id; }).length,
+      'Cadastrada em': e.createdAt ? new Date(e.createdAt).toLocaleDateString('pt-BR') : '',
+      'Atualizada em': e.updatedAt ? new Date(e.updatedAt).toLocaleDateString('pt-BR') : ''
     };
   });
   if (window.XLSX) {
     var ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [32, 10, 22, 24, 18, 60, 40, 22, 30, 20, 16, 26, 30, 12].map(function (w) { return { wch: w }; });
+    ws['!cols'] = [36, 20, 10, 14, 14].map(function (w) { return { wch: w }; });
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Empresas');
     XLSX.writeFile(wb, 'empresas-mxsdr-' + new Date().toISOString().slice(0, 10) + '.xlsx');
@@ -2168,40 +1902,30 @@ document.addEventListener('keydown', function (ev) {
 function rodarTestes() {
   var res = [];
   function t(nome, cond) { res.push({ nome: nome, ok: !!cond }); }
-  var emp = {
-    id: 'T1', nome: 'Empresa Teste Ltda', anoFundacao: '2010', cidade: 'Limeira/SP',
-    segmentoAlvo: 'Indústrias', setorDecisor: 'Compras',
-    servicos: [{ nome: 'Serviço A', desc: 'desc A' }, { nome: 'Serviço B', desc: '' }, { nome: 'Serviço C', desc: 'x' }, { nome: 'Serviço D', desc: 'y' }],
-    diferenciais: 'Equipe própria', certificacoes: 'ISO 9001',
-    clientes: ['Cliente 1', 'Cliente 2'],
-    contatoResponsavel: 'Carlos', contatoTel: '(19) 9999', contatoEmail: 'c@e.com'
-  };
+  var emp = { id: 'T1', nome: 'Empresa Teste Ltda', cnpj: '12.345.678/0001-90' };
   var r = preencherTemplate(emp, 'Maria Silva');
-  t('Preenche sem deixar placeholder conhecido', !/\{\{(EMPRESA|SERVICOS|SDR|CIDADE|SEGMENTO_ALVO|SETOR_DECISOR|CLIENTES|CONTATOS|ANO_FUNDACAO|DIFERENCIAIS|CERTIFICACOES|EMPRESA_UPPER|DATA_GERACAO)\}\}/.test(r.txt));
+  t('Preenche sem deixar placeholder conhecido', !/\{\{(EMPRESA|EMPRESA_UPPER|CNPJ|SDR|DATA_GERACAO)\}\}/.test(r.txt));
   t('Nome da empresa aparece', r.txt.indexOf('Empresa Teste Ltda') !== -1);
   t('Nome em maiúsculas aparece', r.txt.indexOf('EMPRESA TESTE LTDA') !== -1);
+  t('CNPJ aparece', r.txt.indexOf('12.345.678/0001-90') !== -1);
   t('SDR aparece', r.txt.indexOf('Maria Silva') !== -1);
-  t('Serviço com descrição vira "Nome: desc"', r.txt.indexOf('Serviço A: desc A') !== -1);
-  t('Serviço sem descrição fica só nome', /Serviço B(?!:)/.test(r.txt));
-  t('Idade calculada no ano de fundação', r.txt.indexOf('2010 (') !== -1);
-  t('Contatos concatenados', r.txt.indexOf('Responsável: Carlos') !== -1 && r.txt.indexOf('E-mail: c@e.com') !== -1);
-  t('Sem campos faltando', r.faltando.length === 0);
-  var emp2 = { id: 'T2', nome: 'Só Nome', servicos: [], clientes: [] };
-  var r2 = preencherTemplate(emp2, '');
-  t('Campo vazio vira (não informado)', r2.txt.indexOf('(não informado)') !== -1);
-  t('Faltando lista campos vazios', r2.faltando.indexOf('CIDADE') !== -1 && r2.faltando.indexOf('SDR') !== -1);
-  t('Completude 100% p/ completa', completude(emp) === 100);
-  t('Completude baixa p/ incompleta', completude(emp2) <= 20);
+  t('Prompt manda extrair dos anexos', r.txt.indexOf('EXTRA') !== -1 && /portf.lio/i.test(r.txt) && /ata/i.test(r.txt));
+  t('Sem campos obrigatórios faltando', r.faltando.length === 0);
+  var emp2 = { id: 'T2', nome: 'Só Nome' };
+  var r2 = preencherTemplate(emp2, 'Ana');
+  t('CNPJ vazio vira "não informado"', r2.txt.indexOf('CNPJ: não informado') !== -1);
+  t('CNPJ opcional não conta como faltando', r2.faltando.indexOf('CNPJ') === -1);
   var hl = highlightPrompt('## TÍTULO\n(não informado)');
   t('Highlight de seção', hl.indexOf('class="h2"') !== -1);
   t('Highlight de não informado', hl.indexOf('class="miss"') !== -1);
   t('esc() neutraliza HTML', esc('<b x="1">') === '&lt;b x=&quot;1&quot;&gt;');
   t('slug() limpa nome de arquivo', slug('Açõés & Cia!') === 'acoes-cia');
+  t('maskCNPJ formata 14 dígitos', (function () { var o = { value: '12345678000190' }; maskCNPJ(o); return o.value === '12.345.678/0001-90'; })());
   t('uid() gera ids únicos', uid() !== uid());
   var bkp = JSON.parse(JSON.stringify({ sistema: 'MxSDR', versao: 1, empresas: [emp], sdrs: [], historico: [] }));
   t('Backup serializa/parseia', bkp.empresas[0].nome === 'Empresa Teste Ltda');
   t('Template padrão tem placeholders essenciais',
-    TEMPLATE_PADRAO.indexOf('{{EMPRESA}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{SERVICOS}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{SDR}}') !== -1);
+    TEMPLATE_PADRAO.indexOf('{{EMPRESA}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{CNPJ}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{SDR}}') !== -1);
   var passou = res.filter(function (x) { return x.ok; }).length;
   var box = document.getElementById('teste-box');
   box.innerHTML = '<h2>Autoteste MxSDR — ' + passou + '/' + res.length + ' passaram</h2>' +

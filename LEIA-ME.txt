@@ -1,0 +1,29 @@
+MxSDR — Gerador de Material Comercial (SDR) · MAXIMOS Soluções Empresariais
+============================================================================
+
+COMO ABRIR
+  Dê dois cliques no arquivo "index.html". Abre direto no navegador (Chrome/Edge),
+  sem instalar nada.
+
+COMO USAR (dia a dia)
+  1. Na tela de entrada, clique no seu nome (ou em "Começar" na primeira vez).
+  2. Em "Gerar material", escolha a empresa e clique no botão verde GERAR MATERIAL.
+  3. Clique em "Copiar prompt", abra o Claude ou ChatGPT (botões na própria tela),
+     cole na conversa e ANEXE o portfólio + a ata da reunião. Envie.
+  4. A IA devolve os dois documentos: Material de Apoio (Script SDR) e
+     Cadência de Contatos.
+
+CADASTRO DE EMPRESAS
+  Menu "Empresas" → "Nova empresa". Preencha o máximo possível (o sistema mostra
+  a % de completude). O prompt pede de 4 a 7 serviços e de 2 a 5 clientes.
+
+IMPORTANTE — BACKUP
+  Os dados ficam salvos no navegador DESTE computador.
+  De vez em quando vá em "Ajustes" → "Exportar backup (.json)" e guarde o
+  arquivo na rede. Para restaurar em outro computador: "Importar backup".
+
+AJUSTES
+  - Equipe SDR: nomes que aparecem na tela de entrada.
+  - Modelo do prompt: o texto-base enviado à IA (editável; dá para restaurar o padrão).
+
+Dúvidas: assessoria@escritorio.com.br · (19) 99805-9985

@@ -1067,27 +1067,34 @@ tbody tr:hover { background: #fafbf8; }
           <div class="card card-pad">
             <div class="card-title">IA — geração automática <span class="ln"></span></div>
             <div class="ai-help" style="margin-bottom:13px">
-              É a IA que lê o portfólio + ata e escreve os documentos. Para testar de graça, use o <b>Google Gemini</b>:
-              crie uma chave gratuita em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a> (sem cartão), cole abaixo e salve. A chave fica só neste navegador.
+              <b>Modo equipe (recomendado):</b> ligue o "relay" uma vez (passo a passo no arquivo <b>COMO-LIGAR-A-IA.txt</b>) e cole o link abaixo. Pronto — <b>a equipe não configura mais nada</b>, só abre, anexa e gera.<br>
+              <b>Modo individual (teste rápido):</b> sem relay, cada PC cola uma chave grátis do Gemini (<a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">criar chave</a>).
             </div>
-            <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
-              <div>
-                <label class="fl">Provedor</label>
-                <select id="ai-provider" onchange="onProviderChange()">
-                  <option value="gemini">Google Gemini (grátis)</option>
-                  <option value="claude">Claude / Anthropic</option>
-                  <option value="openai">OpenAI / ChatGPT</option>
-                </select>
-              </div>
-              <div>
-                <label class="fl">Modelo</label>
-                <input type="text" id="ai-model" placeholder="gemini-2.0-flash">
-              </div>
-              <div class="full">
-                <label class="fl">Chave de API</label>
-                <input type="password" id="ai-key" placeholder="cole sua chave aqui" autocomplete="off">
-              </div>
+            <div style="margin-bottom:12px">
+              <label class="fl">Link do relay <span style="color:var(--ink3);font-weight:400">(modo equipe — preencha só isto)</span></label>
+              <input type="text" id="ai-relay" placeholder="https://...workers.dev" autocomplete="off">
             </div>
+            <details>
+              <summary style="font-size:12px;color:var(--ink2);cursor:pointer;margin-bottom:10px">Modo individual (chave por PC)</summary>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+                <div>
+                  <label class="fl">Provedor</label>
+                  <select id="ai-provider" onchange="onProviderChange()">
+                    <option value="gemini">Google Gemini (grátis)</option>
+                    <option value="claude">Claude / Anthropic</option>
+                    <option value="openai">OpenAI / ChatGPT</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="fl">Modelo</label>
+                  <input type="text" id="ai-model" placeholder="gemini-2.0-flash">
+                </div>
+                <div class="full">
+                  <label class="fl">Chave de API</label>
+                  <input type="password" id="ai-key" placeholder="cole sua chave aqui" autocomplete="off">
+                </div>
+              </div>
+            </details>
             <div class="btn-row" style="margin-top:13px">
               <button class="btn btn-pri" onclick="salvarIA()">Salvar</button>
               <button class="btn" id="btn-test-ia" onclick="testarIA()">Testar conexão</button>
@@ -1629,10 +1636,14 @@ function baixarDoc(id) {
 }
 
 /* ════════════════════════ IA — CONFIG ════════════════════════ */
-function getIA() { return lsGet('sdrmx_ai', { provider: 'gemini', key: '', model: '' }); }
+/* RELAY_URL: quando preenchido, a equipe NÃO precisa de chave — o app usa este link
+   central (um relay grátis que guarda a chave em segredo). Ligado uma vez pelo dono. */
+var RELAY_URL = '';
+function getIA() { return lsGet('sdrmx_ai', { provider: 'gemini', key: '', model: '', relay: '' }); }
+function effectiveRelay() { var ia = getIA(); return ((ia.relay || '').trim()) || RELAY_URL; }
 function modeloPadrao(p) { return p === 'claude' ? 'claude-sonnet-4-6' : p === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash'; }
 function nomeProvedor(p) { return { gemini: 'Gemini', claude: 'Claude', openai: 'OpenAI' }[p] || p; }
-function iaConfigurada() { var ia = getIA(); return !!(ia.key && ia.key.trim()); }
+function iaConfigurada() { return !!(effectiveRelay() || (getIA().key && getIA().key.trim())); }
 function onProviderChange() {
   var p = document.getElementById('ai-provider').value;
   document.getElementById('ai-model').placeholder = modeloPadrao(p);
@@ -1642,6 +1653,7 @@ function renderIAConfig() {
   document.getElementById('ai-provider').value = ia.provider || 'gemini';
   document.getElementById('ai-model').value = ia.model || '';
   document.getElementById('ai-key').value = ia.key || '';
+  var rel = document.getElementById('ai-relay'); if (rel) rel.value = ia.relay || '';
   document.getElementById('ai-model').placeholder = modeloPadrao(ia.provider || 'gemini');
   atualizaAiStatus();
 }
@@ -1649,20 +1661,24 @@ function salvarIA() {
   var p = document.getElementById('ai-provider').value;
   var m = document.getElementById('ai-model').value.trim() || modeloPadrao(p);
   var k = document.getElementById('ai-key').value.trim();
-  lsSet('sdrmx_ai', { provider: p, key: k, model: m });
+  var rel = (document.getElementById('ai-relay') || {}).value || '';
+  lsSet('sdrmx_ai', { provider: p, key: k, model: m, relay: rel.trim() });
   document.getElementById('ai-model').value = m;
   atualizaAiStatus();
-  toast(k ? 'IA configurada!' : 'Salvo (sem chave ainda).', !k);
+  toast(iaConfigurada() ? 'IA configurada!' : 'Salvo (falta chave ou link do relay).', !iaConfigurada());
 }
 function atualizaAiStatus() {
-  var ia = getIA(), on = iaConfigurada(), nm = nomeProvedor(ia.provider);
+  var on = iaConfigurada(), relay = effectiveRelay(), ia = getIA();
+  var txt = !on ? 'IA não configurada — vá em Ajustes'
+    : relay ? 'IA pronta · modo equipe (relay)'
+    : ('IA: ' + nomeProvedor(ia.provider) + ' · ' + (ia.model || modeloPadrao(ia.provider)));
   var s = document.getElementById('ai-status'), t = document.getElementById('ai-status-txt');
-  if (s) { s.className = 'ai-status ' + (on ? 'on' : 'off'); t.textContent = on ? ('IA: ' + nm + ' · ' + (ia.model || modeloPadrao(ia.provider))) : 'IA não configurada — vá em Ajustes'; }
+  if (s) { s.className = 'ai-status ' + (on ? 'on' : 'off'); t.textContent = txt; }
   var s2 = document.getElementById('aj-ai-status'), t2 = document.getElementById('aj-ai-status-txt');
-  if (s2) { s2.className = 'ai-status ' + (on ? 'on' : 'off'); t2.textContent = on ? 'Configurada' : 'Sem chave'; }
+  if (s2) { s2.className = 'ai-status ' + (on ? 'on' : 'off'); t2.textContent = on ? (relay ? 'Modo equipe (relay) ✓' : 'Configurada ✓') : 'Sem chave/relay'; }
 }
 function testarIA() {
-  if (!iaConfigurada()) { toast('Cole a chave e clique em Salvar primeiro.', true); return; }
+  if (!iaConfigurada()) { toast('Configure a chave ou o link do relay e clique em Salvar.', true); return; }
   var btn = document.getElementById('btn-test-ia'), orig = btn.textContent;
   btn.textContent = 'Testando…'; btn.disabled = true;
   callAI('Responda apenas com a palavra OK.').then(function (txt) {
@@ -1673,7 +1689,20 @@ function testarIA() {
 }
 
 /* ════════════════════════ IA — CHAMADA ════════════════════════ */
+async function callRelay(url, promptText) {
+  var r;
+  try {
+    r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: promptText }) });
+  } catch (e) { throw new Error('não consegui falar com o relay (link errado ou fora do ar)'); }
+  var d;
+  try { d = await r.json(); } catch (e) { throw new Error('o relay não respondeu em JSON — confira o link'); }
+  if (!r.ok || (d && d.error)) throw new Error((d && d.error) || ('relay HTTP ' + r.status));
+  if (typeof d.text !== 'string') throw new Error('resposta do relay sem o campo "text"');
+  return d.text;
+}
 async function callAI(promptText) {
+  var relay = effectiveRelay();
+  if (relay) return await callRelay(relay, promptText);
   var ia = getIA();
   var model = ia.model || modeloPadrao(ia.provider);
   if (!ia.key) throw new Error('chave de API não configurada');

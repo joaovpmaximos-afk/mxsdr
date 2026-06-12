@@ -1,0 +1,45 @@
+COMO LIGAR A IA DO MxSDR (uma vez só) — modo equipe
+====================================================
+Depois disto, a equipe SÓ abre o site, anexa os 2 arquivos e clica em gerar.
+Ninguém mais precisa de chave nem de configurar nada.
+Tempo: ~10 minutos. Tudo de graça.
+
+------------------------------------------------------------
+PARTE 1 — Criar a chave do Gemini (grátis, sem cartão)
+------------------------------------------------------------
+1. Abra:  https://aistudio.google.com/app/apikey
+2. Entre com sua conta Google.
+3. Clique em "Create API key" (Criar chave de API).
+4. Copie a chave (começa com AIza...). Guarde num bloco de notas.
+
+------------------------------------------------------------
+PARTE 2 — Criar o "relay" na Cloudflare (grátis)
+------------------------------------------------------------
+1. Abra:  https://dash.cloudflare.com  e crie uma conta grátis (ou entre).
+2. Menu da esquerda: "Workers & Pages"  ->  botão "Create"  ->  "Create Worker".
+3. Dê um nome (ex.: mxsdr-relay)  ->  "Deploy".
+4. Clique em "Edit code" (Editar código).
+5. APAGUE tudo o que estiver na tela e COLE TODO o conteúdo do arquivo
+   "relay-cloudflare.js" (está nesta mesma pasta).
+6. Ache a linha:
+        const GEMINI_KEY = "COLE_AQUI_SUA_CHAVE_DO_GEMINI";
+   e troque o texto entre aspas pela chave que você copiou na PARTE 1.
+7. Clique em "Deploy" (canto superior direito).
+8. Copie o endereço que aparece (algo como:
+        https://mxsdr-relay.SEUNOME.workers.dev )
+
+------------------------------------------------------------
+PARTE 3 — Ligar no MxSDR
+------------------------------------------------------------
+Opção A (mais fácil): mande esse endereço para o suporte do sistema, que ele
+   deixa embutido no app — a equipe não vê nem precisa fazer nada.
+
+Opção B (você mesmo): no MxSDR, abra Ajustes -> IA -> campo "Link do relay",
+   cole o endereço, clique em "Salvar" e depois em "Testar conexão".
+   Tem que aparecer "Conexão OK".
+
+Pronto! A chave fica guardada só na Cloudflare — ninguém vê.
+A equipe agora só faz: abrir -> anexar portfólio + ata -> Gerar documentos.
+
+(Se preferir um atalho só para o teste de aprovação, fale com o suporte:
+ dá para embutir uma chave temporária e a equipe já usa hoje, sem a Cloudflare.)

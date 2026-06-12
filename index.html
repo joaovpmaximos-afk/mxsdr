@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -836,6 +837,17 @@ tbody tr:hover { background: #fafbf8; }
     <div class="login-title">Maximos <em>SDR</em></div>
     <div class="login-sub">Gerador de Material Comercial · MAXIMOS Soluções Empresariais</div>
     <div class="login-bar"></div>
+    <div id="login-gate" style="display:none">
+      <div class="login-q">Senha do escritório</div>
+      <div class="login-new" style="display:block;margin:0 auto">
+        <input type="password" id="senha-escritorio" placeholder="Digite a senha da equipe" autocomplete="current-password" onkeydown="if(event.key==='Enter')entrarEscritorio()">
+        <div class="row">
+          <button class="btn btn-pri btn-sm" id="btn-gate" onclick="entrarEscritorio()">Entrar</button>
+        </div>
+        <div style="font-size:11px;color:#84877f;margin-top:12px;line-height:1.6">Só na primeira vez em cada computador.<br>Não sabe a senha? Pergunte ao responsável.</div>
+      </div>
+    </div>
+    <div id="login-perfis">
     <div class="login-q">Quem está usando?</div>
     <div class="profiles" id="profiles"></div>
     <div class="login-new" id="login-new">
@@ -844,6 +856,7 @@ tbody tr:hover { background: #fafbf8; }
         <button class="btn btn-pri btn-sm" onclick="criarPerfil()">Entrar</button>
         <button class="btn btn-ghost btn-sm" style="color:#9b9e97" onclick="fecharNovoPerfil()">Cancelar</button>
       </div>
+    </div>
     </div>
     <div class="login-foot">
       <b>MAXIMOS SOLUÇÕES EMPRESARIAIS</b><br>
@@ -1138,7 +1151,7 @@ tbody tr:hover { background: #fafbf8; }
           <div class="card card-pad">
             <div class="card-title">Backup dos dados <span class="ln"></span></div>
             <p style="font-size:12.5px;color:var(--ink2);margin-bottom:13px">
-              Os dados ficam salvos <b>neste computador</b> (navegador). Exporte um backup de vez em quando e guarde na rede — assim nada se perde.
+              Com o <b>banco da equipe</b> ligado, empresas e histórico ficam na nuvem, compartilhados por todos os computadores. O backup .json continua valendo como cópia de segurança extra (e para importar dados antigos).
             </p>
             <div class="btn-row">
               <button class="btn btn-dark" onclick="exportarBackup()">
@@ -1158,6 +1171,7 @@ tbody tr:hover { background: #fafbf8; }
             <div class="btn-row">
               <button class="btn btn-danger btn-sm" onclick="limparHistorico()">Limpar histórico</button>
               <button class="btn btn-danger btn-sm" onclick="apagarTudo()">Apagar todos os dados</button>
+              <button class="btn btn-sm" onclick="sairDoBanco()">Desconectar do banco</button>
             </div>
           </div>
         </div>
@@ -1317,6 +1331,150 @@ function lsSet(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
 }
 
+/* ─────────── BANCO DE DADOS (Supabase, compartilhado pela equipe) ─────────── */
+var SUPA_URL = 'https://tkvbytnbuoimhebbixwk.supabase.co';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrdmJ5dG5idW9pbWhlYmJpeHdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMzk1NjUsImV4cCI6MjA5NjgxNTU2NX0.tnPjVpSflbOUHf3loLToBv133pgooSaDLnswiI0pVtE';
+var SUPA_EMAIL = 'equipe@maximossdr.app';
+var supa = null;
+var nuvemOk = false;
+function supaInit() {
+  if (!supa && window.supabase) { try { supa = window.supabase.createClient(SUPA_URL, SUPA_KEY); } catch (e) {} }
+  return supa;
+}
+function isUuid(s) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s || '')); }
+function empFromDb(r) { return { id: r.id, nome: r.nome, cnpj: r.cnpj || '', createdAt: r.created_at, updatedAt: r.updated_at }; }
+function histFromDb(r) {
+  return { id: r.id, ts: new Date(r.ts).getTime(), sdr: r.sdr || '', empresaId: r.empresa_id, empresaNome: r.empresa_nome || '',
+    tipo: r.tipo || 'docs', material: r.material || '', cadencia: r.cadencia || '', txt: r.txt || '', chat: r.chat || [] };
+}
+function histToDb(h, empresasValidas) {
+  var eid = isUuid(h.empresaId) ? h.empresaId : null;
+  if (eid && empresasValidas && empresasValidas.indexOf(eid) === -1) eid = null;
+  return { id: isUuid(h.id) ? h.id : undefined, ts: new Date(h.ts || Date.now()).toISOString(), sdr: h.sdr || '',
+    empresa_id: eid, empresa_nome: h.empresaNome || '', tipo: h.tipo || (h.material ? 'docs' : 'prompt'),
+    material: h.material || '', cadencia: h.cadencia || '', txt: h.txt || '', chat: h.chat || [] };
+}
+function nuvemFalhou(r) {
+  var m = (r && r.error && r.error.message) ? r.error.message : 'erro desconhecido';
+  toast('Não salvou no banco (' + m + ') — a alteração ficou só neste computador.', true);
+}
+function cloudIns(tab, obj) { if (!nuvemOk || !supa) return; supa.from(tab).insert(obj).then(function (r) { if (r.error) nuvemFalhou(r); }); }
+function cloudUpd(tab, obj, id) { if (!nuvemOk || !supa || !isUuid(id)) return; supa.from(tab).update(obj).eq('id', id).then(function (r) { if (r.error) nuvemFalhou(r); }); }
+function cloudDel(tab, id) { if (!nuvemOk || !supa || !isUuid(id)) return; supa.from(tab).delete().eq('id', id).then(function (r) { if (r.error) nuvemFalhou(r); }); }
+async function carregarNuvem(silencioso) {
+  if (!supaInit()) return false;
+  try {
+    var r = await Promise.all([
+      supa.from('sdr_empresas').select('*').order('updated_at', { ascending: false }),
+      supa.from('sdr_equipe').select('*').order('created_at', { ascending: true }),
+      supa.from('sdr_historico').select('*').order('ts', { ascending: false }).limit(300),
+      supa.from('sdr_config').select('*')
+    ]);
+    for (var i = 0; i < r.length; i++) { if (r[i].error) throw r[i].error; }
+    empresas = (r[0].data || []).map(empFromDb);
+    sdrs = (r[1].data || []).map(function (x) { return { id: x.id, nome: x.nome }; });
+    historico = (r[2].data || []).map(histFromDb);
+    (r[3].data || []).forEach(function (c) { if (c.chave === 'template' && c.valor) lsSet('sdrmx_template', c.valor); });
+    nuvemOk = true;
+    saveEmpresas(); saveSdrs(); saveHistorico();
+    return true;
+  } catch (e) {
+    nuvemOk = false;
+    if (!silencioso) toast('Sem conexão com o banco — usando os dados deste computador.', true);
+    return false;
+  }
+}
+async function migrarSePreciso(locais) {
+  if (!nuvemOk) return;
+  var temLocal = (locais.e && locais.e.length) || (locais.h && locais.h.length) || (locais.s && locais.s.length);
+  var nuvemVazia = !empresas.length && !historico.length && !sdrs.length;
+  if (!temLocal || !nuvemVazia) return;
+  try {
+    var idsEmp = [];
+    if (locais.e.length) {
+      var emps = locais.e.map(function (e) { return { id: isUuid(e.id) ? e.id : undefined, nome: e.nome || 'Sem nome', cnpj: e.cnpj || '' }; });
+      var re = await supa.from('sdr_empresas').insert(emps).select('id');
+      if (re.error) throw re.error;
+      idsEmp = (re.data || []).map(function (x) { return x.id; });
+    }
+    if (locais.s.length) {
+      var rs = await supa.from('sdr_equipe').insert(locais.s.map(function (s) { return { id: isUuid(s.id) ? s.id : undefined, nome: s.nome }; }));
+      if (rs.error) throw rs.error;
+    }
+    if (locais.h.length) {
+      var rh = await supa.from('sdr_historico').insert(locais.h.map(function (h) { return histToDb(h, idsEmp); }));
+      if (rh.error) throw rh.error;
+    }
+    var tpl = lsGet('sdrmx_template', null);
+    if (typeof tpl === 'string' && tpl.trim()) await supa.from('sdr_config').upsert({ chave: 'template', valor: tpl });
+    await carregarNuvem(true);
+    toast('Dados deste computador enviados para o banco da equipe!');
+  } catch (e) {
+    toast('Migração parcial: ' + (e.message || e), true);
+  }
+}
+
+function mostrarGate() {
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('login-gate').style.display = 'block';
+  document.getElementById('login-perfis').style.display = 'none';
+  setTimeout(function () { var i = document.getElementById('senha-escritorio'); if (i) i.focus(); }, 80);
+}
+function mostrarPerfis() {
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('login-gate').style.display = 'none';
+  document.getElementById('login-perfis').style.display = 'block';
+  renderLogin();
+}
+function prosseguirAposNuvem() {
+  var p = perfilAtual();
+  if (p) {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').classList.add('on');
+    renderApp();
+  } else {
+    mostrarPerfis();
+  }
+}
+async function entrarEscritorio() {
+  var inp = document.getElementById('senha-escritorio');
+  var pw = (inp.value || '').trim();
+  if (!pw) { toast('Digite a senha do escritório.', true); return; }
+  var btn = document.getElementById('btn-gate');
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  try {
+    var r = await supa.auth.signInWithPassword({ email: SUPA_EMAIL, password: pw });
+    if (r.error) throw r.error;
+    var locais = { e: lsGet('sdrmx_empresas', []), h: lsGet('sdrmx_historico', []), s: lsGet('sdrmx_sdrs', []) };
+    await carregarNuvem();
+    await migrarSePreciso(locais);
+    prosseguirAposNuvem();
+  } catch (e) {
+    var m = (e && e.message) || '';
+    toast(m.indexOf('Invalid login') !== -1 ? 'Senha incorreta — confira com o responsável.' : ('Não consegui entrar: ' + m), true);
+  }
+  btn.disabled = false; btn.textContent = 'Entrar';
+}
+async function iniciarApp() {
+  if (!supaInit()) {  // sem internet/biblioteca: modo local (como antes)
+    nuvemOk = false;
+    prosseguirAposNuvem();
+    return;
+  }
+  var sess = null;
+  try { sess = (await supa.auth.getSession()).data.session; } catch (e) {}
+  if (!sess) { mostrarGate(); return; }
+  var locais = { e: lsGet('sdrmx_empresas', []), h: lsGet('sdrmx_historico', []), s: lsGet('sdrmx_sdrs', []) };
+  await carregarNuvem();
+  await migrarSePreciso(locais);
+  prosseguirAposNuvem();
+}
+function sairDoBanco() {
+  if (!confirm('Desconectar este computador do banco?\n\nA equipe vai precisar digitar a senha do escritório de novo aqui.')) return;
+  if (supa) supa.auth.signOut().then(function () { location.reload(); }, function () { location.reload(); });
+  else location.reload();
+}
+
 var empresas  = lsGet('sdrmx_empresas', []);
 var sdrs      = lsGet('sdrmx_sdrs', []);
 var historico = lsGet('sdrmx_historico', []);
@@ -1461,7 +1619,7 @@ function criarPerfil() {
   if (!nome) { toast('Digite um nome para entrar.', true); return; }
   var existe = sdrs.find(function (s) { return s.nome.toLowerCase() === nome.toLowerCase(); });
   var s = existe || { id: uid(), nome: nome };
-  if (!existe) { sdrs.push(s); saveSdrs(); }
+  if (!existe) { sdrs.push(s); saveSdrs(); cloudIns('sdr_equipe', { id: s.id, nome: s.nome }); }
   fecharNovoPerfil();
   entrar(s.id);
 }
@@ -1478,8 +1636,7 @@ function trocarPerfil() {
   perfilId = null;
   lsSet('sdrmx_perfil', null);
   document.getElementById('app').classList.remove('on');
-  document.getElementById('login').style.display = 'flex';
-  renderLogin();
+  mostrarPerfis();
 }
 function perfilAtual() {
   return sdrs.find(function (s) { return s.id === perfilId; }) || null;
@@ -1500,6 +1657,18 @@ function go(p) {
   if (p === 'historico') renderHistorico();
   if (p === 'ajustes') renderAjustes();
   window.scrollTo(0, 0);
+  if (nuvemOk && (p === 'gerar' || p === 'empresas' || p === 'historico')) {
+    setTimeout(function () {
+      if (paginaAtual !== p) return;
+      carregarNuvem(true).then(function (ok) {
+        if (!ok || paginaAtual !== p) return;
+        if (p === 'gerar') renderEmpPick();
+        if (p === 'empresas') renderEmpresas();
+        if (p === 'historico') renderHistorico();
+        atualizaSidebarStats();
+      });
+    }, 1200);
+  }
 }
 
 /* ════════════════════════ PÁGINA GERAR ════════════════════════ */
@@ -1578,6 +1747,7 @@ function gerarMaterial() {
     historico.unshift(item);
     if (historico.length > 300) historico.length = 300;
     saveHistorico();
+    cloudIns('sdr_historico', histToDb(item));
     renderDocumento(item, r.faltando);
     atualizaSidebarStats();
     toast('Material gerado e salvo no histórico!');
@@ -1963,6 +2133,7 @@ function gerarDocumentos() {
     historico.unshift(item);
     if (historico.length > 300) historico.length = 300;
     saveHistorico();
+    cloudIns('sdr_historico', histToDb(item));
     btn.classList.remove('loading');
     document.getElementById('gen-area').innerHTML = '';
     renderDocumentosResult(item);
@@ -2137,6 +2308,7 @@ function refinarDocumentos(itemId) {
       if (r.cadencia) g.cadencia = normalizarMd(r.cadencia);
       g.chat.push({ role: 'ai', text: r.resumo || 'Documentos atualizados.', edit: true });
       saveHistorico();
+      cloudUpd('sdr_historico', { material: g.material, cadencia: g.cadencia, chat: g.chat || [] }, g.id);
       var y = window.scrollY;
       renderDocumentosResult(g, true);
       window.scrollTo(0, y);
@@ -2146,6 +2318,7 @@ function refinarDocumentos(itemId) {
     } else {
       g.chat.push({ role: 'ai', text: r.resumo || 'Certo!' });
       saveHistorico();
+      cloudUpd('sdr_historico', { chat: g.chat || [] }, g.id);
       chatUiPronto(g);
     }
   }).catch(function (e) {
@@ -2300,6 +2473,7 @@ function excluirEmpresa(id) {
   empresas = empresas.filter(function (x) { return x.id !== id; });
   if (gerarEmpresaId === id) gerarEmpresaId = null;
   saveEmpresas();
+  cloudDel('sdr_empresas', id);
   renderEmpresas();
   atualizaSidebarStats();
   toast('Empresa excluída.');
@@ -2350,9 +2524,11 @@ function salvarEmpresa() {
   if (editingId) {
     var idx = empresas.findIndex(function (e) { return e.id === editingId; });
     if (idx !== -1) { obj.createdAt = empresas[idx].createdAt; empresas[idx] = obj; }
+    cloudUpd('sdr_empresas', { nome: obj.nome, cnpj: obj.cnpj }, obj.id);
   } else {
     obj.createdAt = obj.updatedAt;
     empresas.unshift(obj);
+    cloudIns('sdr_empresas', { id: isUuid(obj.id) ? obj.id : undefined, nome: obj.nome, cnpj: obj.cnpj });
   }
   saveEmpresas();
   atualizaSidebarStats();
@@ -2457,6 +2633,7 @@ function limparHistorico() {
   if (!confirm('Apagar TODO o histórico de gerações (' + historico.length + ' itens)?')) return;
   historico = [];
   saveHistorico();
+  if (nuvemOk && supa) supa.from('sdr_historico').delete().gte('ts', '1970-01-01').then(function (r) { if (r.error) nuvemFalhou(r); });
   renderHistorico();
   atualizaSidebarStats();
   toast('Histórico limpo.');
@@ -2490,8 +2667,10 @@ function addSdr() {
   if (sdrs.find(function (s) { return s.nome.toLowerCase() === nome.toLowerCase(); })) {
     toast('Esse nome já está na equipe.', true); return;
   }
-  sdrs.push({ id: uid(), nome: nome });
+  var novaSdr = { id: uid(), nome: nome };
+  sdrs.push(novaSdr);
   saveSdrs();
+  cloudIns('sdr_equipe', { id: novaSdr.id, nome: novaSdr.nome });
   inp.value = '';
   renderAjustes();
   toast('SDR adicionada à equipe!');
@@ -2502,6 +2681,7 @@ function delSdr(id) {
   if (!confirm('Remover "' + s.nome + '" da equipe?')) return;
   sdrs = sdrs.filter(function (x) { return x.id !== id; });
   saveSdrs();
+  cloudDel('sdr_equipe', id);
   if (perfilId === id) { perfilId = null; lsSet('sdrmx_perfil', null); }
   renderAjustes();
   renderPerfilChip();
@@ -2515,12 +2695,14 @@ function salvarTemplate() {
     if (v.indexOf('{{' + k + '}}') === -1) avisos.push('{{' + k + '}}');
   });
   lsSet('sdrmx_template', v);
+  if (nuvemOk && supa) supa.from('sdr_config').upsert({ chave: 'template', valor: v }).then(function (r) { if (r.error) nuvemFalhou(r); });
   if (avisos.length) toast('Salvo, mas sem os campos: ' + avisos.join(', ') + '. Confira se foi de propósito.', true);
-  else toast('Modelo do prompt salvo!');
+  else toast('Modelo do prompt salvo' + (nuvemOk ? ' para toda a equipe!' : '!'));
 }
 function restaurarTemplate() {
   if (!confirm('Restaurar o modelo padrão do prompt? Suas edições serão perdidas.')) return;
   localStorage.removeItem('sdrmx_template');
+  if (nuvemOk && supa) supa.from('sdr_config').delete().eq('chave', 'template').then(function (r) { if (r.error) nuvemFalhou(r); });
   document.getElementById('tpl-edit').value = TEMPLATE_PADRAO;
   toast('Modelo padrão restaurado.');
 }
@@ -2538,7 +2720,7 @@ function importarBackup(ev) {
   ev.target.value = '';
   if (!file) return;
   var reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = async function (e) {
     try {
       var d = JSON.parse(e.target.result);
       if (!d || (d.sistema !== 'Maximos SDR' && d.sistema !== 'MxSDR') || !Array.isArray(d.empresas)) {
@@ -2546,18 +2728,30 @@ function importarBackup(ev) {
       }
       if (!confirm('Importar backup de ' + (d.exportadoEm ? new Date(d.exportadoEm).toLocaleString('pt-BR') : 'data desconhecida') +
         '?\n\nEmpresas: ' + d.empresas.length + ' · Histórico: ' + (d.historico || []).length +
-        '\n\nIsso SUBSTITUI os dados atuais.')) return;
-      empresas = d.empresas || [];
-      sdrs = Array.isArray(d.sdrs) ? d.sdrs : [];
-      historico = Array.isArray(d.historico) ? d.historico : [];
+        (nuvemOk ? '\n\nOs itens serão ADICIONADOS ao banco da equipe.' : '\n\nIsso SUBSTITUI os dados atuais.'))) return;
+      var mapEmp = {};
+      empresas = (d.empresas || []).map(function (x) { var nid = isUuid(x.id) ? x.id : uid(); mapEmp[x.id] = nid; return Object.assign({}, x, { id: nid }); });
+      sdrs = (Array.isArray(d.sdrs) ? d.sdrs : []).map(function (s) { return { id: isUuid(s.id) ? s.id : uid(), nome: s.nome }; });
+      historico = (Array.isArray(d.historico) ? d.historico : []).map(function (h) {
+        return Object.assign({}, h, { id: isUuid(h.id) ? h.id : uid(), empresaId: mapEmp[h.empresaId] || (isUuid(h.empresaId) ? h.empresaId : null) });
+      });
       if (typeof d.template === 'string' && d.template.trim()) lsSet('sdrmx_template', d.template);
       saveEmpresas(); saveSdrs(); saveHistorico();
+      if (nuvemOk && supa) {
+        var idsEmp = empresas.map(function (x) { return x.id; });
+        if (empresas.length) { var r1 = await supa.from('sdr_empresas').upsert(empresas.map(function (x) { return { id: x.id, nome: x.nome || 'Sem nome', cnpj: x.cnpj || '' }; })); if (r1.error) throw r1.error; }
+        if (sdrs.length) { var r2 = await supa.from('sdr_equipe').upsert(sdrs); if (r2.error) throw r2.error; }
+        if (historico.length) { var r3 = await supa.from('sdr_historico').upsert(historico.map(function (h) { return histToDb(h, idsEmp); })); if (r3.error) throw r3.error; }
+        var tplB = lsGet('sdrmx_template', null);
+        if (typeof tplB === 'string' && tplB.trim()) await supa.from('sdr_config').upsert({ chave: 'template', valor: tplB });
+        await carregarNuvem(true);
+      }
       gerarEmpresaId = null;
       atualizaSidebarStats();
       renderAjustes();
-      toast('Backup importado com sucesso!');
+      toast('Backup importado' + (nuvemOk ? ' para o banco da equipe!' : ' com sucesso!'));
     } catch (err) {
-      toast('Erro ao ler o arquivo: ' + err.message, true);
+      toast('Erro ao importar: ' + (err.message || err), true);
     }
   };
   reader.readAsText(file, 'utf-8');
@@ -2589,12 +2783,22 @@ function exportarExcel() {
   toast(empresas.length + ' empresa(s) exportada(s)!');
 }
 function apagarTudo() {
-  if (!confirm('APAGAR TODOS OS DADOS do Maximos SDR?\n\nEmpresas, histórico, equipe e modelo do prompt serão perdidos.')) return;
+  if (!confirm('APAGAR TODOS OS DADOS do Maximos SDR?' + (nuvemOk ? '\n\n⚠ Isso apaga do BANCO DA EQUIPE — vale para TODOS os computadores!' : '') + '\n\nEmpresas, histórico, equipe e modelo do prompt serão perdidos.')) return;
   if (!confirm('Tem certeza mesmo? Essa ação não tem volta.\n\nDica: exporte um backup antes.')) return;
-  ['sdrmx_empresas', 'sdrmx_sdrs', 'sdrmx_historico', 'sdrmx_template', 'sdrmx_perfil'].forEach(function (k) {
-    localStorage.removeItem(k);
-  });
-  location.reload();
+  var fim = function () {
+    ['sdrmx_empresas', 'sdrmx_sdrs', 'sdrmx_historico', 'sdrmx_template', 'sdrmx_perfil'].forEach(function (k) {
+      localStorage.removeItem(k);
+    });
+    location.reload();
+  };
+  if (nuvemOk && supa) {
+    Promise.all([
+      supa.from('sdr_historico').delete().gte('ts', '1970-01-01'),
+      supa.from('sdr_empresas').delete().gte('created_at', '1970-01-01'),
+      supa.from('sdr_equipe').delete().gte('created_at', '1970-01-01'),
+      supa.from('sdr_config').delete().neq('chave', '')
+    ]).then(fim, fim);
+  } else fim();
 }
 
 /* ════════════════════════ SHELL ════════════════════════ */
@@ -2616,6 +2820,8 @@ function atualizaSidebarStats() {
 function renderApp() {
   renderPerfilChip();
   atualizaSidebarStats();
+  var ver = document.querySelector('.sb-ver');
+  if (ver) ver.textContent = 'Maximos SDR · ' + (nuvemOk ? 'banco da equipe ✓' : 'modo local (sem banco)');
   var hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
   document.getElementById('top-date').textContent = hoje;
   go('gerar');
@@ -2689,6 +2895,11 @@ function rodarTestes() {
   t('htmlParaTexto remove tags e script', (function () { var x = htmlParaTexto('<style>a{}</style><p>Olá <b>mundo</b></p><script>var y=1<\/script>'); return x.indexOf('Olá') !== -1 && x.indexOf('mundo') !== -1 && x.indexOf('<') === -1 && x.indexOf('var y') === -1; })());
   var bkp = JSON.parse(JSON.stringify({ sistema: 'MxSDR', versao: 1, empresas: [emp], sdrs: [], historico: [] }));
   t('Backup serializa/parseia', bkp.empresas[0].nome === 'Empresa Teste Ltda');
+  t('isUuid valida certo', isUuid('de24613d-a0e9-45ac-9084-84c2140e3a7b') === true && isUuid('abc123') === false && isUuid(uid()) === true);
+  var eDb = empFromDb({ id: 'x-id', nome: 'Acme', cnpj: '11', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z' });
+  t('empFromDb mapeia campos', eDb.nome === 'Acme' && eDb.cnpj === '11' && eDb.createdAt === '2026-01-01T00:00:00Z');
+  var hDb = histToDb({ id: 'de24613d-a0e9-45ac-9084-84c2140e3a7b', ts: 1750000000000, sdr: 'Ana', empresaId: 'nao-uuid', empresaNome: 'X', material: 'M', cadencia: 'C', chat: [{ role: 'user', text: 'oi' }] });
+  t('histToDb converte ts e anula empresa inválida', hDb.empresa_id === null && hDb.ts.indexOf('20') === 0 && hDb.material === 'M' && hDb.chat.length === 1);
   t('Template padrão tem placeholders essenciais',
     TEMPLATE_PADRAO.indexOf('{{EMPRESA}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{CNPJ}}') !== -1 && TEMPLATE_PADRAO.indexOf('{{SDR}}') !== -1);
   var passou = res.filter(function (x) { return x.ok; }).length;
@@ -2722,14 +2933,7 @@ function rodarTestes() {
     });
   })();
 
-  var p = perfilAtual();
-  if (p) {
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('app').classList.add('on');
-    renderApp();
-  } else {
-    renderLogin();
-  }
+  iniciarApp();
   if (location.search.indexOf('teste=1') !== -1) rodarTestes();
 })();
 </script>

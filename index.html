@@ -2612,7 +2612,9 @@ function renderHistorico() {
       '<td style="text-align:right;white-space:nowrap">' +
         '<button class="btn btn-sm" onclick="verGeracao(\'' + h.id + '\')">Ver</button> ' +
         '<button class="btn btn-sm" onclick="copiarGeracao(\'' + h.id + '\')">Copiar</button> ' +
-        '<button class="btn btn-sm btn-ghost" title="Gerar de novo com os dados atuais da empresa" onclick="regerar(\'' + h.id + '\')">↻ Regerar</button>' +
+        '<button class="btn btn-sm btn-ghost" title="Gerar de novo com os dados atuais da empresa" onclick="regerar(\'' + h.id + '\')">↻ Regerar</button> ' +
+        '<button class="btn btn-sm btn-ghost" title="Excluir esta geração" onclick="excluirGeracao(\'' + h.id + '\')" style="color:var(--ink3)">' +
+          '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"/></svg></button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -2653,6 +2655,17 @@ function verGeracao(id) {
 }
 function fecharModal() {
   document.getElementById('modal-ver').classList.remove('on');
+}
+function excluirGeracao(id) {
+  var g = geracaoPorId(id);
+  if (!g) return;
+  if (!confirm('Excluir esta geração?\n\n' + (g.empresaNome || '—') + ' · ' + dataFmt(g.ts) + ' · ' + (g.sdr || '—') + (nuvemOk ? '\n\n(some para toda a equipe)' : ''))) return;
+  historico = historico.filter(function (h) { return h.id !== id; });
+  saveHistorico();
+  cloudDel('sdr_historico', id);
+  renderHistorico();
+  atualizaSidebarStats();
+  toast('Geração excluída.');
 }
 function regerar(id) {
   var g = geracaoPorId(id);

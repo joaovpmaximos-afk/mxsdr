@@ -547,6 +547,18 @@ textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
 .sheet-md li { margin: 2px 0; }
 .sheet-md blockquote { margin: 0 0 9px; padding: 7px 13px; border-left: 3px solid var(--green); background: var(--card2); border-radius: 0 8px 8px 0; font-style: italic; color: var(--ink2); }
 
+/* CHAT DE AJUSTE */
+.chatlog { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 260px; overflow-y: auto; }
+.chat-empty { font-size: 12px; color: var(--ink3); padding: 2px 0; }
+.chat-msg { font-size: 12.5px; line-height: 1.5; max-width: 90%; padding: 8px 12px; border-radius: 12px; }
+.chat-msg.user { align-self: flex-end; background: var(--dark); color: #fff; border-bottom-right-radius: 3px; }
+.chat-msg.ai { align-self: flex-start; background: var(--green-bg); color: var(--green-deep); border-bottom-left-radius: 3px; display: flex; gap: 7px; align-items: flex-start; }
+.chat-msg.ai svg { width: 14px; height: 14px; stroke: var(--green-deep); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; margin-top: 2px; }
+.chat-msg.pending { align-self: flex-start; background: var(--card2); color: var(--ink2); display: flex; align-items: center; gap: 8px; }
+.chat-msg.pending .sp { width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+.chatbox { display: flex; gap: 8px; }
+.chatbox input { flex: 1; }
+
 #btn-gerar { width: 100%; position: relative; }
 #btn-gerar.loading { pointer-events: none; }
 #btn-gerar.loading .lbl { visibility: hidden; }
@@ -2002,8 +2014,77 @@ function renderDocumentosResult(item) {
           '<button class="btn btn-sm" onclick="copiarDoc(\'' + item.id + '\')">Copiar texto</button>' +
         '</div>' +
       '</div>' +
+      '<div class="card card-pad" style="margin-top:14px">' +
+        '<div class="card-title">Ajustar com a IA <span class="ln"></span></div>' +
+        '<div class="chatlog" id="chatlog">' + renderChat(item) + '</div>' +
+        '<div class="chatbox">' +
+          '<input type="text" id="chat-input" placeholder="Peça um ajuste… ex.: deixe os e-mails mais curtos, reforce o atendimento 24h" onkeydown="if(event.key===\'Enter\')refinarDocumentos(\'' + item.id + '\')">' +
+          '<button class="btn btn-pri" id="chat-send" onclick="refinarDocumentos(\'' + item.id + '\')">Enviar</button>' +
+        '</div>' +
+        '<div class="hint" style="margin-top:8px">A IA reescreve os 2 documentos aplicando o pedido. Pode pedir vários ajustes em sequência — depois é só baixar de novo.</div>' +
+      '</div>' +
     '</div>';
   document.getElementById('doc-atual').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function renderChat(item) {
+  if (!item.chat || !item.chat.length) return '<div class="chat-empty">Nenhum ajuste ainda. Escreva abaixo o que quer mudar nos textos.</div>';
+  return item.chat.map(function (m) {
+    if (m.role === 'user') return '<div class="chat-msg user"><span>' + esc(m.text) + '</span></div>';
+    return '<div class="chat-msg ai"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span>' + esc(m.text) + '</span></div>';
+  }).join('');
+}
+function buildRefinePrompt(g, instr) {
+  return [
+    'Você é especialista em prospecção comercial B2B. Abaixo estão DOIS documentos já gerados para a empresa "' + (g.empresaNome || '') + '": Material de Apoio (Script SDR) e Cadência de Contato.',
+    'O usuário pediu um AJUSTE. Reescreva os DOIS documentos aplicando o pedido, preservando o que já está bom, mantendo o português e o mesmo formato Markdown (## seções, ### subtítulos, - listas, **negrito**, > falas). Não invente dados que não estejam nos documentos.',
+    '', 'PEDIDO DO USUÁRIO:', instr,
+    '', '=== MATERIAL DE APOIO (versão atual) ===', g.material || '',
+    '', '=== CADÊNCIA DE CONTATO (versão atual) ===', g.cadencia || '',
+    '', 'FORMATO DA RESPOSTA (obrigatório, sem texto fora, sem crases de código):',
+    '<<<RESUMO>>>', '(uma frase curta dizendo o que você mudou)',
+    '<<<MATERIAL>>>', '# Material de Apoio — ' + (g.empresaNome || ''), '(documento completo revisado em Markdown)',
+    '<<<CADENCIA>>>', '# Cadência de Contato — ' + (g.empresaNome || ''), '(documento completo revisado em Markdown)'
+  ].join('\n');
+}
+function parseRefine(text) {
+  var t = String(text || '').replace(/```+[a-zA-Z]*\n?/g, '').replace(/```+/g, '');
+  var iR = t.indexOf('<<<RESUMO>>>'), iM = t.indexOf('<<<MATERIAL>>>'), iC = t.indexOf('<<<CADENCIA>>>');
+  var resumo = '', material = '', cadencia = '';
+  if (iM !== -1 && iC !== -1 && iC > iM) {
+    if (iR !== -1 && iR < iM) resumo = t.slice(iR + 12, iM).trim();
+    material = t.slice(iM + 14, iC).trim();
+    cadencia = t.slice(iC + 14).replace(/<<<END>>>/g, '').trim();
+  }
+  return { resumo: resumo, material: material, cadencia: cadencia };
+}
+function refinarDocumentos(itemId) {
+  var g = geracaoPorId(itemId); if (!g) return;
+  var inp = document.getElementById('chat-input');
+  var instr = ((inp || {}).value || '').trim();
+  if (!instr) { toast('Escreva o ajuste que você quer.', true); return; }
+  if (!iaConfigurada()) { toast('Configure a IA em Ajustes.', true); go('ajustes'); return; }
+  var send = document.getElementById('chat-send'); var orig = send ? send.textContent : '';
+  if (send) { send.textContent = 'Ajustando…'; send.disabled = true; }
+  if (inp) { inp.disabled = true; }
+  if (!g.chat) g.chat = [];
+  g.chat.push({ role: 'user', text: instr });
+  var log = document.getElementById('chatlog');
+  if (log) log.innerHTML = renderChat(g) + '<div class="chat-msg pending"><span class="sp"></span>ajustando os documentos…</div>';
+  callAI(buildRefinePrompt(g, instr)).then(function (txt) {
+    var r = parseRefine(txt);
+    if (!r.material && !r.cadencia) throw new Error('a IA não respondeu no formato esperado — tente reformular o pedido');
+    if (r.material) g.material = r.material;
+    if (r.cadencia) g.cadencia = r.cadencia;
+    g.chat.push({ role: 'ai', text: r.resumo || 'Documentos atualizados.' });
+    saveHistorico();
+    renderDocumentosResult(g);
+    toast('Documentos ajustados!');
+  }).catch(function (e) {
+    g.chat.push({ role: 'ai', text: 'Não consegui aplicar: ' + e.message });
+    saveHistorico();
+    renderDocumentosResult(g);
+    toast('Erro no ajuste: ' + e.message, true);
+  });
 }
 function trocaTab(btn, which) {
   var p = btn.parentNode; p.querySelectorAll('.doc-tab').forEach(function (b) { b.classList.remove('on'); });
@@ -2505,6 +2586,9 @@ function rodarTestes() {
   var pg = parseGen('lixo\n<<<MATERIAL>>>\n# Mat\n- a\n<<<CADENCIA>>>\n# Cad\ntexto');
   t('parseGen separa os 2 documentos', pg.material.indexOf('# Mat') !== -1 && pg.cadencia.indexOf('# Cad') !== -1);
   t('parseGen remove crases de código', parseGen('```markdown\n<<<MATERIAL>>>\nX\n<<<CADENCIA>>>\nY\n```').material.indexOf('`') === -1);
+  var pr = parseRefine('<<<RESUMO>>>\nEncurtei os e-mails\n<<<MATERIAL>>>\n# Mat novo\n<<<CADENCIA>>>\n# Cad novo');
+  t('parseRefine separa resumo/material/cadencia', pr.resumo === 'Encurtei os e-mails' && pr.material.indexOf('# Mat novo') !== -1 && pr.cadencia.indexOf('# Cad novo') !== -1);
+  t('buildRefinePrompt inclui pedido e docs atuais', buildRefinePrompt({ empresaNome: 'X', material: 'MAT_ATUAL', cadencia: 'CAD_ATUAL' }, 'meu pedido aqui').indexOf('meu pedido aqui') !== -1 && buildRefinePrompt({ empresaNome: 'X', material: 'MAT_ATUAL', cadencia: 'CAD_ATUAL' }, 'p').indexOf('MAT_ATUAL') !== -1);
   var bx = mdToBodyXml('# T\n## Seção\n- item **forte**\n> fala');
   t('mdToBodyXml gera Title/SecHead/bullet/negrito', bx.indexOf('w:val="Title"') !== -1 && bx.indexOf('w:val="SecHead"') !== -1 && bx.indexOf('w:numId') !== -1 && bx.indexOf('<w:b/>') !== -1);
   t('mdToHtml gera h2/li/strong', (function () { var h = mdToHtml('## S\n- a **b**'); return h.indexOf('<h2>') !== -1 && h.indexOf('<li>') !== -1 && h.indexOf('<strong>') !== -1; })());

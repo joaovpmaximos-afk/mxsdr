@@ -8,7 +8,7 @@
 // ============================================================
 
 const GEMINI_KEY = "COLE_AQUI_SUA_CHAVE_DO_GEMINI";
-const MODELO = "gemini-2.0-flash";
+const MODELO = "gemini-2.5-flash";
 // Domínios autorizados a usar o relay (o site do MxSDR):
 const ORIGENS_PERMITIDAS = ["https://joaovpmaximos-afk.github.io"];
 

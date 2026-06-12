@@ -1642,8 +1642,10 @@ function baixarDoc(id) {
 var RELAY_URL = '';
 /* EMBED_KEY_B64: chave central do escritório (Gemini), em base64 para não ficar "crua"
    no código. Preenchida uma vez pelo suporte → toda a equipe usa sem configurar nada. */
-var EMBED_KEY_B64 = 'QVEuQWI4Uk42S0R1MW9vdzJQUmpxUHBGZTVRc3Azc0JiMHlqekdJNWVBVnpNZ1ZQVDVfNGc=';
-var EMBED_PROVIDER = 'gemini';
+var EMBED_KEY_B64 = 'c2stOGZkOGRjN2UwZjEwNDYwZDgwOWViMzA2MjQyODVmMDA=';
+var EMBED_KEY_FALLBACK_B64 = 'QVEuQWI4Uk42S0R1MW9vdzJQUmpxUHBGZTVRc3Azc0JiMHlqekdJNWVBVnpNZ1ZQVDVfNGc=';
+var EMBED_PROVIDER = 'deepseek';
+var EMBED_PROVIDER_FALLBACK = 'gemini';
 function getIA() { return lsGet('sdrmx_ai', { provider: 'gemini', key: '', model: '', relay: '' }); }
 function effectiveRelay() { var ia = getIA(); return ((ia.relay || '').trim()) || RELAY_URL; }
 function embedKey() { try { return EMBED_KEY_B64 ? atob(EMBED_KEY_B64) : ''; } catch (e) { return ''; } }
@@ -1710,15 +1712,7 @@ async function callRelay(url, promptText) {
   if (typeof d.text !== 'string') throw new Error('resposta do relay sem o campo "text"');
   return d.text;
 }
-async function callAI(promptText) {
-  var relay = effectiveRelay();
-  if (relay) return await callRelay(relay, promptText);
-  var ia = getIA();
-  var key = (ia.key || '').trim();
-  var provider = ia.provider || 'gemini';
-  if (!key && embedKey()) { key = embedKey(); provider = EMBED_PROVIDER; }   // chave central do escritório
-  if (!key) throw new Error('IA não configurada (sem chave nem relay)');
-  var model = ia.model || modeloPadrao(provider);
+async function callWithKey(provider, key, model, promptText) {
   if (provider === 'claude') {
     var r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1752,6 +1746,29 @@ async function callAI(promptText) {
   var cand = (d3.candidates || [])[0];
   if (!cand || !cand.content) throw new Error('a IA não retornou conteúdo');
   return (cand.content.parts || []).map(function (p) { return p.text || ''; }).join('');
+}
+function embedFallbackKey() { try { return (typeof EMBED_KEY_FALLBACK_B64 !== 'undefined' && EMBED_KEY_FALLBACK_B64) ? atob(EMBED_KEY_FALLBACK_B64) : ''; } catch (e) { return ''; } }
+async function callAI(promptText) {
+  var relay = effectiveRelay();
+  if (relay) return await callRelay(relay, promptText);
+  var ia = getIA();
+  var userKey = (ia.key || '').trim();
+  if (userKey) {
+    var up = ia.provider || 'gemini';
+    return await callWithKey(up, userKey, ia.model || modeloPadrao(up), promptText);
+  }
+  // chave central do escritório, com reserva automática
+  if (embedKey()) {
+    try {
+      return await callWithKey(EMBED_PROVIDER, embedKey(), modeloPadrao(EMBED_PROVIDER), promptText);
+    } catch (e) {
+      if (embedFallbackKey() && typeof EMBED_PROVIDER_FALLBACK !== 'undefined' && EMBED_PROVIDER_FALLBACK) {
+        return await callWithKey(EMBED_PROVIDER_FALLBACK, embedFallbackKey(), modeloPadrao(EMBED_PROVIDER_FALLBACK), promptText);
+      }
+      throw e;
+    }
+  }
+  throw new Error('IA não configurada (sem chave nem relay)');
 }
 
 /* ════════════════════════ ANEXOS / EXTRAÇÃO ════════════════════════ */

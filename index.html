@@ -543,7 +543,7 @@ textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
 .sheet-md h2 { font-family: var(--fd); font-size: 14.5px; color: #1A3A5C; margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid #1A3A5C; }
 .sheet-md h3 { font-size: 13.5px; color: var(--ink); margin: 14px 0 5px; font-weight: 700; }
 .sheet-md p { margin: 0 0 7px; }
-.sheet-md ul { margin: 0 0 9px; padding-left: 20px; }
+.sheet-md ul, .sheet-md ol { margin: 0 0 9px; padding-left: 20px; }
 .sheet-md li { margin: 2px 0; }
 .sheet-md blockquote { margin: 0 0 9px; padding: 7px 13px; border-left: 3px solid var(--green); background: var(--card2); border-radius: 0 8px 8px 0; font-style: italic; color: var(--ink2); }
 
@@ -1908,7 +1908,8 @@ function buildGenPrompt(emp, sdrNome) {
     '# Cadência de Contato — ' + (emp.nome || ''),
     '(conteúdo completo da Cadência em Markdown)',
     '',
-    'Markdown: "## " para títulos de seção, "### " para subtítulos, "- " para listas, "**texto**" para negrito, "> " para falas/scripts. Não use tabelas nem crases.');
+    'Markdown permitido (e somente este): "## " títulos de seção, "### " subtítulos, "- " listas, "1. " passos numerados, "**texto**" negrito, "*texto*" itálico, "> " falas/scripts.',
+    'NUNCA use: tabelas, linhas separadoras (---), crases de código, HTML, títulos #### ou mais profundos.');
   return partes.join('\n');
 }
 function parseGen(text) {
@@ -1958,7 +1959,7 @@ function gerarDocumentos() {
     renderStages(2);
     var docs = parseGen(txt);
     if (!docs.material) throw new Error('a IA não respondeu no formato esperado — tente de novo');
-    var item = { id: uid(), ts: Date.now(), sdr: sdrNome, empresaId: emp.id, empresaNome: emp.nome, tipo: 'docs', material: docs.material, cadencia: docs.cadencia };
+    var item = { id: uid(), ts: Date.now(), sdr: sdrNome, empresaId: emp.id, empresaNome: emp.nome, tipo: 'docs', material: normalizarMd(docs.material), cadencia: normalizarMd(docs.cadencia) };
     historico.unshift(item);
     if (historico.length > 300) historico.length = 300;
     saveHistorico();
@@ -1975,21 +1976,41 @@ function gerarDocumentos() {
 }
 function copiarPromptManual() { gerarMaterial(); }
 
-/* renderização markdown → html (preview) */
-function mdInline(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); }
-function mdToHtml(md) {
-  var lines = String(md || '').split('\n'), html = '', ul = false;
-  function closeUl() { if (ul) { html += '</ul>'; ul = false; } }
-  lines.forEach(function (ln) {
-    if (/^### /.test(ln)) { closeUl(); html += '<h3>' + mdInline(ln.slice(4)) + '</h3>'; }
-    else if (/^## /.test(ln)) { closeUl(); html += '<h2>' + mdInline(ln.slice(3)) + '</h2>'; }
-    else if (/^# /.test(ln)) { closeUl(); html += '<h1>' + mdInline(ln.slice(2)) + '</h1>'; }
-    else if (/^\s*[-*] /.test(ln)) { if (!ul) { html += '<ul>'; ul = true; } html += '<li>' + mdInline(ln.replace(/^\s*[-*] /, '')) + '</li>'; }
-    else if (/^> /.test(ln)) { closeUl(); html += '<blockquote>' + mdInline(ln.slice(2)) + '</blockquote>'; }
-    else if (!ln.trim()) { closeUl(); }
-    else { closeUl(); html += '<p>' + mdInline(ln) + '</p>'; }
+/* normalização do markdown vindo da IA (formatação consistente) */
+function normalizarMd(md) {
+  var lines = String(md || '').replace(/\r/g, '').split('\n').map(function (ln) {
+    var t = ln.replace(/\s+$/, '');
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(t)) return '';        // linhas --- viram vazio
+    t = t.replace(/^(\s*)(\d+)\)\s+/, '$1$2. ');                   // "1)" vira "1."
+    t = t.replace(/^#{4,}\s+/, '### ');                            // #### ou mais vira ###
+    t = t.replace(/^(\s*)[•·●] +/, '$1- ');                        // bullets unicode viram "-"
+    t = t.replace(/`{1,3}/g, '');                                   // remove crases
+    t = t.replace(/<<<[A-Z]+>>>/g, '');                             // remove marcadores vazados
+    return t;
   });
-  closeUl();
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
+}
+
+/* renderização markdown → html (preview) */
+function mdInline(s) {
+  return esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+}
+function mdToHtml(md) {
+  var lines = normalizarMd(md).split('\n'), html = '', ul = false, ol = false;
+  function closeLists() { if (ul) { html += '</ul>'; ul = false; } if (ol) { html += '</ol>'; ol = false; } }
+  lines.forEach(function (ln) {
+    if (/^### /.test(ln)) { closeLists(); html += '<h3>' + mdInline(ln.slice(4)) + '</h3>'; }
+    else if (/^## /.test(ln)) { closeLists(); html += '<h2>' + mdInline(ln.slice(3)) + '</h2>'; }
+    else if (/^# /.test(ln)) { closeLists(); html += '<h1>' + mdInline(ln.slice(2)) + '</h1>'; }
+    else if (/^\s*[-*] /.test(ln)) { if (ol) { html += '</ol>'; ol = false; } if (!ul) { html += '<ul>'; ul = true; } html += '<li>' + mdInline(ln.replace(/^\s*[-*] /, '')) + '</li>'; }
+    else if (/^\s*\d+\. /.test(ln)) { if (ul) { html += '</ul>'; ul = false; } if (!ol) { html += '<ol>'; ol = true; } html += '<li>' + mdInline(ln.replace(/^\s*\d+\. /, '')) + '</li>'; }
+    else if (/^> /.test(ln)) { closeLists(); html += '<blockquote>' + mdInline(ln.slice(2)) + '</blockquote>'; }
+    else if (!ln.trim()) { closeLists(); }
+    else { closeLists(); html += '<p>' + mdInline(ln) + '</p>'; }
+  });
+  closeLists();
   return html;
 }
 function renderDocumentosResult(item, manterPosicao) {
@@ -2049,7 +2070,7 @@ function buildRefinePrompt(g, instr) {
     'Decida conforme a mensagem do usuário:',
     '- Se for um PEDIDO DE ALTERAÇÃO nos documentos (mudar texto, tom, acrescentar, remover, reorganizar, encurtar, traduzir etc.), reescreva os DOIS documentos completos já com a mudança aplicada e responda no FORMATO A.',
     '- Se for uma PERGUNTA, opinião, dúvida ou conversa que NÃO exige mudar os documentos, responda de forma útil, direta e prática no FORMATO B, sem reescrever nada.',
-    'Mantenha o português e o formato Markdown dos documentos (## seções, ### subtítulos, - listas, **negrito**, > falas). Não invente dados sobre a empresa que não estejam nos documentos ou na conversa; se faltar informação, diga.',
+    'Mantenha o português e o formato Markdown dos documentos (## seções, ### subtítulos, - listas, "1. " passos numerados, **negrito**, *itálico*, > falas). NUNCA use tabelas, linhas separadoras (---), crases de código ou HTML. Não invente dados sobre a empresa que não estejam nos documentos ou na conversa; se faltar informação, diga.',
     '',
     'CONVERSA ATÉ AQUI:',
     hist || '(primeira mensagem)',
@@ -2112,8 +2133,8 @@ function refinarDocumentos(itemId) {
   callAI(buildRefinePrompt(g, instr)).then(function (txt) {
     var r = parseRefine(txt);
     if (r.material || r.cadencia) {
-      if (r.material) g.material = r.material;
-      if (r.cadencia) g.cadencia = r.cadencia;
+      if (r.material) g.material = normalizarMd(r.material);
+      if (r.cadencia) g.cadencia = normalizarMd(r.cadencia);
       g.chat.push({ role: 'ai', text: r.resumo || 'Documentos atualizados.', edit: true });
       saveHistorico();
       var y = window.scrollY;
@@ -2147,26 +2168,31 @@ function copiarDoc(id) {
 
 /* ════════════════════════ MARKDOWN → .DOCX (JSZip) ════════════════════════ */
 function xmlEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-function mdRuns(text, italic) {
-  var parts = String(text).split(/(\*\*)/), bold = false, out = '';
-  parts.forEach(function (p) {
-    if (p === '**') { bold = !bold; return; }
-    if (!p) return;
-    var rpr = (bold || italic) ? ('<w:rPr>' + (bold ? '<w:b/>' : '') + (italic ? '<w:i/>' : '') + '</w:rPr>') : '';
-    out += '<w:r>' + rpr + '<w:t xml:space="preserve">' + xmlEsc(p) + '</w:t></w:r>';
+function mdRuns(text, base) {
+  base = base || {};
+  var out = '';
+  String(text).split(/(\*\*[^*]+\*\*|\*[^*\n]+\*)/g).forEach(function (tk) {
+    if (!tk) return;
+    var b = !!base.b, i = !!base.i;
+    if (/^\*\*[^*]+\*\*$/.test(tk)) { b = true; tk = tk.slice(2, -2); }
+    else if (/^\*[^*\n]+\*$/.test(tk)) { i = true; tk = tk.slice(1, -1); }
+    var rpr = '';
+    if (b || i || base.color) rpr = '<w:rPr>' + (b ? '<w:b/>' : '') + (i ? '<w:i/>' : '') + (base.color ? '<w:color w:val="' + base.color + '"/>' : '') + '</w:rPr>';
+    out += '<w:r>' + rpr + '<w:t xml:space="preserve">' + xmlEsc(tk) + '</w:t></w:r>';
   });
   return out || '<w:r><w:t/></w:r>';
 }
 function mdToBodyXml(md) {
-  var lines = String(md || '').split('\n'), xml = '';
+  var lines = normalizarMd(md).split('\n'), xml = '';
   lines.forEach(function (ln) {
-    if (/^# /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>' + mdRuns(ln.slice(2), false) + '</w:p>';
-    else if (/^## /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="SecHead"/></w:pPr>' + mdRuns(ln.slice(3), false) + '</w:p>';
-    else if (/^### /.test(ln)) xml += '<w:p><w:pPr><w:spacing w:before="160" w:after="40"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="1A3A5C"/></w:rPr><w:t xml:space="preserve">' + xmlEsc(ln.slice(4)) + '</w:t></w:r></w:p>';
-    else if (/^\s*[-*] /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>' + mdRuns(ln.replace(/^\s*[-*] /, ''), false) + '</w:p>';
-    else if (/^> /.test(ln)) xml += '<w:p><w:pPr><w:ind w:left="360"/><w:spacing w:after="160"/></w:pPr>' + mdRuns(ln.slice(2), true) + '</w:p>';
+    if (/^# /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>' + mdRuns(ln.slice(2)) + '</w:p>';
+    else if (/^## /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="SecHead"/></w:pPr>' + mdRuns(ln.slice(3)) + '</w:p>';
+    else if (/^### /.test(ln)) xml += '<w:p><w:pPr><w:keepNext/><w:spacing w:before="160" w:after="40"/></w:pPr>' + mdRuns(ln.slice(4), { b: true, color: '1A3A5C' }) + '</w:p>';
+    else if (/^\s*[-*] /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>' + mdRuns(ln.replace(/^\s*[-*] /, '')) + '</w:p>';
+    else if (/^\s*\d+\. /.test(ln)) xml += '<w:p><w:pPr><w:ind w:left="360" w:hanging="360"/><w:spacing w:after="40"/></w:pPr>' + mdRuns(ln.trim()) + '</w:p>';
+    else if (/^> /.test(ln)) xml += '<w:p><w:pPr><w:ind w:left="360"/><w:spacing w:after="160"/></w:pPr>' + mdRuns(ln.slice(2), { i: true }) + '</w:p>';
     else if (!ln.trim()) xml += '<w:p/>';
-    else xml += '<w:p>' + mdRuns(ln, false) + '</w:p>';
+    else xml += '<w:p>' + mdRuns(ln) + '</w:p>';
   });
   return xml;
 }
@@ -2641,6 +2667,13 @@ function rodarTestes() {
   t('parseRefine fallback texto sem marcadores', parseRefine('resposta direta da IA').chatOnly === true && parseRefine('resposta direta da IA').resumo === 'resposta direta da IA');
   t('anexos aceitam HTML', ((document.getElementById('file-docs') || { accept: '' }).accept || '').indexOf('.html') !== -1);
   t('htmlParaTexto respeita limite custom', htmlParaTexto('<p>' + new Array(60).join('palavra ') + '</p>', 50).length <= 50);
+  var nm = normalizarMd('## T\n---\n1) passo\n#### sub\n• ponto\n`cod`\n<<<MATERIAL>>>fim');
+  t('normalizarMd limpa ---, 1), ####, •, crases e marcadores', nm.indexOf('---') === -1 && nm.indexOf('1. passo') !== -1 && nm.indexOf('### sub') !== -1 && nm.indexOf('- ponto') !== -1 && nm.indexOf('`') === -1 && nm.indexOf('<<<') === -1);
+  var mh = mdToHtml('1. um\n2. dois\n\ntexto *itálico* aqui');
+  t('mdToHtml gera lista numerada e itálico', mh.indexOf('<ol>') !== -1 && mh.split('<li>').length === 3 && mh.indexOf('<em>itálico</em>') !== -1);
+  var bx2 = mdToBodyXml('### Etapa — **E-mail**\n1. primeiro passo\n*obs*');
+  t('mdToBodyXml: ### sem asteriscos vazando + itálico + numerada', bx2.indexOf('**') === -1 && bx2.indexOf('<w:i/>') !== -1 && bx2.indexOf('1. primeiro passo') !== -1 && bx2.indexOf('w:hanging') !== -1);
+  t('mdRuns negrito no meio do título ###', mdToBodyXml('### A **B** C').indexOf('<w:b/>') !== -1);
   t('buildRefinePrompt inclui pedido e docs atuais', buildRefinePrompt({ empresaNome: 'X', material: 'MAT_ATUAL', cadencia: 'CAD_ATUAL' }, 'meu pedido aqui').indexOf('meu pedido aqui') !== -1 && buildRefinePrompt({ empresaNome: 'X', material: 'MAT_ATUAL', cadencia: 'CAD_ATUAL' }, 'p').indexOf('MAT_ATUAL') !== -1);
   var bx = mdToBodyXml('# T\n## Seção\n- item **forte**\n> fala');
   t('mdToBodyXml gera Title/SecHead/bullet/negrito', bx.indexOf('w:val="Title"') !== -1 && bx.indexOf('w:val="SecHead"') !== -1 && bx.indexOf('w:numId') !== -1 && bx.indexOf('<w:b/>') !== -1);

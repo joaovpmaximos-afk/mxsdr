@@ -2,8 +2,9 @@ Maximos SDR — Gerador de Material Comercial · MAXIMOS Soluções Empresariais
 ============================================================================
 
 ENDEREÇO DO SISTEMA
-  https://joaovpmaximos-afk.github.io/mxsdr/
-  (salve nos favoritos — funciona em qualquer computador)
+  https://sdr.maximosse.com.br
+  (salve nos favoritos — funciona em qualquer computador;
+   o endereço antigo joaovpmaximos-afk.github.io/mxsdr redireciona para este)
 
 PRIMEIRA VEZ EM UM COMPUTADOR
   1. Abra o endereço acima.

@@ -10,7 +10,7 @@
 const GEMINI_KEY = "COLE_AQUI_SUA_CHAVE_DO_GEMINI";
 const MODELO = "gemini-2.5-flash";
 // Domínios autorizados a usar o relay (o site do Maximos SDR):
-const ORIGENS_PERMITIDAS = ["https://joaovpmaximos-afk.github.io"];
+const ORIGENS_PERMITIDAS = ["https://sdr.maximosse.com.br", "https://joaovpmaximos-afk.github.io"];
 
 export default {
   async fetch(request) {

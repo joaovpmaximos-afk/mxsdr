@@ -6,6 +6,8 @@
 <title>MxSDR · Gerador de Material Comercial — MAXIMOS</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -485,6 +487,53 @@ textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
 .anexo-item.ok .bx { background: var(--green); border-color: var(--green); }
 .anexo-item.ok .bx svg { opacity: 1; }
 
+/* DROPZONES DE ANEXO */
+.drop {
+  border: 1.5px dashed var(--border2);
+  border-radius: 11px;
+  padding: 13px 14px;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex; align-items: center; gap: 11px;
+  background: var(--card);
+}
+.drop:hover, .drop.drag { border-color: var(--green); background: rgba(4,156,116,.04); }
+.drop.ok { border-style: solid; border-color: rgba(4,156,116,.45); background: rgba(4,156,116,.05); }
+.drop .dic { width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0; background: var(--card2); display: inline-flex; align-items: center; justify-content: center; }
+.drop.ok .dic { background: var(--green); }
+.drop .dic svg { width: 17px; height: 17px; stroke: var(--ink2); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.drop.ok .dic svg { stroke: #fff; }
+.drop .dtxt { flex: 1; min-width: 0; }
+.drop .dt { font-size: 12.5px; font-weight: 600; }
+.drop .ds { font-size: 11px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drop .dx { border: none; background: none; color: var(--ink3); cursor: pointer; font-size: 16px; padding: 2px 4px; display: none; line-height: 1; }
+.drop.ok .dx { display: block; }
+.drop.ok .dx:hover { color: var(--red); }
+
+.ai-status { font-size: 11.5px; margin-top: 9px; display: flex; align-items: center; gap: 6px; }
+.ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border2); flex-shrink: 0; }
+.ai-status.on .ai-dot { background: var(--green); }
+.ai-status.off .ai-dot { background: #d98a2b; }
+.ai-help { font-size: 11.5px; color: var(--ink2); line-height: 1.6; }
+.ai-help a { color: var(--green-deep); font-weight: 600; }
+
+.gen-stage { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--ink2); padding: 6px 0; }
+.gen-stage .sp { width: 15px; height: 15px; border: 2px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+.gen-stage.done .sp { border: none; background: var(--green); position: relative; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.doc-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.doc-tab { padding: 7px 14px; border-radius: 9px; border: 1px solid var(--border2); background: var(--card); cursor: pointer; font-size: 12.5px; font-weight: 550; font-family: var(--fb); color: var(--ink2); transition: all .14s; }
+.doc-tab.on { background: var(--dark); color: #fff; border-color: var(--dark); }
+.sheet-md { padding: 24px 36px 30px; font-family: var(--fb); font-size: 13.5px; line-height: 1.62; color: #2f312d; max-height: 520px; overflow-y: auto; }
+.sheet-md h1 { font-family: var(--fd); font-size: 19px; color: var(--dark); margin: 0 0 4px; letter-spacing: -.02em; }
+.sheet-md h2 { font-family: var(--fd); font-size: 14.5px; color: #1A3A5C; margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid #1A3A5C; }
+.sheet-md h3 { font-size: 13.5px; color: var(--ink); margin: 14px 0 5px; font-weight: 700; }
+.sheet-md p { margin: 0 0 7px; }
+.sheet-md ul { margin: 0 0 9px; padding-left: 20px; }
+.sheet-md li { margin: 2px 0; }
+.sheet-md blockquote { margin: 0 0 9px; padding: 7px 13px; border-left: 3px solid var(--green); background: var(--card2); border-radius: 0 8px 8px 0; font-style: italic; color: var(--ink2); }
+
 #btn-gerar { width: 100%; position: relative; }
 #btn-gerar.loading { pointer-events: none; }
 #btn-gerar.loading .lbl { visibility: hidden; }
@@ -840,11 +889,11 @@ tbody tr:hover { background: #fafbf8; }
     <div class="page on" id="page-gerar">
       <div class="hero">
         <div class="hi" id="hero-hi">Olá!</div>
-        <p>Escolha a empresa, confirme seu nome e clique em <b style="color:#2ee8b0">Gerar material</b>. O prompt sai pronto para colar na IA — é só anexar o portfólio e a ata da reunião.</p>
+        <p>Escolha a empresa, anexe o <b style="color:#2ee8b0">portfólio</b> e a <b style="color:#2ee8b0">ata</b>, e clique em gerar. O próprio sistema monta os 2 documentos (Script SDR + Cadência) e disponibiliza para download.</p>
         <div class="steps">
           <div class="step"><span class="n">1</span> Escolha a empresa</div>
-          <div class="step"><span class="n">2</span> Confirme a SDR</div>
-          <div class="step"><span class="n">3</span> Gere, copie e cole na IA</div>
+          <div class="step"><span class="n">2</span> Anexe portfólio + ata</div>
+          <div class="step"><span class="n">3</span> Gere e baixe os .docx</div>
         </div>
       </div>
 
@@ -873,29 +922,35 @@ tbody tr:hover { background: #fafbf8; }
             </div>
           </div>
           <div class="card card-pad">
-            <div class="card-title">3 · Antes de enviar à IA <span class="ln"></span></div>
-            <div class="anexo-chk">
-              <div class="anexo-item" onclick="this.classList.toggle('ok')">
-                <span class="bx"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>
-                Tenho o <b>&nbsp;portfólio&nbsp;</b> da empresa em mãos
+            <div class="card-title">3 · Anexos <span class="ln"></span></div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <div class="drop" id="drop-portfolio" onclick="document.getElementById('file-portfolio').click()">
+                <span class="dic"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></span>
+                <div class="dtxt"><div class="dt">Portfólio</div><div class="ds" id="ds-portfolio">PDF, DOCX ou TXT</div></div>
+                <button class="dx" title="Remover" onclick="event.stopPropagation();limparAnexo('portfolio')">✕</button>
               </div>
-              <div class="anexo-item" onclick="this.classList.toggle('ok')">
-                <span class="bx"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>
-                Tenho a <b>&nbsp;ata da reunião&nbsp;</b> em mãos
+              <input type="file" id="file-portfolio" accept=".pdf,.docx,.txt" style="display:none" onchange="anexar('portfolio', this.files[0])">
+              <div class="drop" id="drop-ata" onclick="document.getElementById('file-ata').click()">
+                <span class="dic"><svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
+                <div class="dtxt"><div class="dt">Ata da reunião</div><div class="ds" id="ds-ata">PDF, DOCX ou TXT</div></div>
+                <button class="dx" title="Remover" onclick="event.stopPropagation();limparAnexo('ata')">✕</button>
               </div>
+              <input type="file" id="file-ata" accept=".pdf,.docx,.txt" style="display:none" onchange="anexar('ata', this.files[0])">
             </div>
-            <div class="hint" style="margin-top:10px">Os dois arquivos devem ser anexados na conversa da IA junto com o prompt gerado.</div>
+            <div class="ai-status off" id="ai-status"><span class="ai-dot"></span><span id="ai-status-txt">IA não configurada</span></div>
           </div>
-          <button class="btn btn-pri btn-lg" id="btn-gerar" onclick="gerarMaterial()" disabled>
+          <button class="btn btn-pri btn-lg" id="btn-gerar" onclick="gerarDocumentos()">
             <span class="lbl" style="display:inline-flex;align-items:center;gap:8px">
               <svg viewBox="0 0 24 24"><path d="M13 2L4.5 13.5h6L10 22l8.5-11.5h-6L13 2z"/></svg>
-              Gerar material
+              Gerar documentos
             </span>
             <span class="dots"><i></i><i></i><i></i></span>
           </button>
+          <button class="btn btn-ghost btn-sm" style="width:100%" onclick="copiarPromptManual()">ou copiar o prompt para colar na IA manualmente</button>
         </div>
       </div>
 
+      <div id="gen-area"></div>
       <div id="doc-area"></div>
     </div>
 
@@ -1009,6 +1064,37 @@ tbody tr:hover { background: #fafbf8; }
       </div>
       <div class="aj-grid">
         <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card card-pad">
+            <div class="card-title">IA — geração automática <span class="ln"></span></div>
+            <div class="ai-help" style="margin-bottom:13px">
+              É a IA que lê o portfólio + ata e escreve os documentos. Para testar de graça, use o <b>Google Gemini</b>:
+              crie uma chave gratuita em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a> (sem cartão), cole abaixo e salve. A chave fica só neste navegador.
+            </div>
+            <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <label class="fl">Provedor</label>
+                <select id="ai-provider" onchange="onProviderChange()">
+                  <option value="gemini">Google Gemini (grátis)</option>
+                  <option value="claude">Claude / Anthropic</option>
+                  <option value="openai">OpenAI / ChatGPT</option>
+                </select>
+              </div>
+              <div>
+                <label class="fl">Modelo</label>
+                <input type="text" id="ai-model" placeholder="gemini-2.0-flash">
+              </div>
+              <div class="full">
+                <label class="fl">Chave de API</label>
+                <input type="password" id="ai-key" placeholder="cole sua chave aqui" autocomplete="off">
+              </div>
+            </div>
+            <div class="btn-row" style="margin-top:13px">
+              <button class="btn btn-pri" onclick="salvarIA()">Salvar</button>
+              <button class="btn" id="btn-test-ia" onclick="testarIA()">Testar conexão</button>
+              <span class="ai-status" id="aj-ai-status" style="margin:0"><span class="ai-dot"></span><span id="aj-ai-status-txt">—</span></span>
+            </div>
+          </div>
+
           <div class="card card-pad">
             <div class="card-title">Equipe SDR <span class="ln"></span></div>
             <div class="equipe-list" id="equipe-list"></div>
@@ -1403,6 +1489,7 @@ function renderGerar() {
   atualizaAvatarGerar();
   sel.onchange = atualizaAvatarGerar;
   renderEmpPick();
+  atualizaAiStatus();
 }
 function atualizaAvatarGerar() {
   var sel = document.getElementById('gerar-sdr');
@@ -1509,6 +1596,7 @@ function geracaoPorId(id) {
 function copiarGeracao(id, btn) {
   var g = geracaoPorId(id);
   if (!g) return;
+  if (g.tipo === 'docs' || g.material) { copiarDoc(id); return; }
   copiarTexto(g.txt, 'Prompt copiado! Agora cole na IA e anexe os arquivos.');
   if (btn) {
     var orig = btn.innerHTML;
@@ -1538,6 +1626,344 @@ function baixarDoc(id) {
     '<body style="font-family:Calibri, sans-serif;font-size:11pt;line-height:1.45">' + corpo + '</body></html>';
   baixar('prompt-sdr-' + slug(g.empresaNome) + '.doc', '﻿' + html, 'application/msword');
   toast('Arquivo .doc baixado.');
+}
+
+/* ════════════════════════ IA — CONFIG ════════════════════════ */
+function getIA() { return lsGet('sdrmx_ai', { provider: 'gemini', key: '', model: '' }); }
+function modeloPadrao(p) { return p === 'claude' ? 'claude-sonnet-4-6' : p === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash'; }
+function nomeProvedor(p) { return { gemini: 'Gemini', claude: 'Claude', openai: 'OpenAI' }[p] || p; }
+function iaConfigurada() { var ia = getIA(); return !!(ia.key && ia.key.trim()); }
+function onProviderChange() {
+  var p = document.getElementById('ai-provider').value;
+  document.getElementById('ai-model').placeholder = modeloPadrao(p);
+}
+function renderIAConfig() {
+  var ia = getIA();
+  document.getElementById('ai-provider').value = ia.provider || 'gemini';
+  document.getElementById('ai-model').value = ia.model || '';
+  document.getElementById('ai-key').value = ia.key || '';
+  document.getElementById('ai-model').placeholder = modeloPadrao(ia.provider || 'gemini');
+  atualizaAiStatus();
+}
+function salvarIA() {
+  var p = document.getElementById('ai-provider').value;
+  var m = document.getElementById('ai-model').value.trim() || modeloPadrao(p);
+  var k = document.getElementById('ai-key').value.trim();
+  lsSet('sdrmx_ai', { provider: p, key: k, model: m });
+  document.getElementById('ai-model').value = m;
+  atualizaAiStatus();
+  toast(k ? 'IA configurada!' : 'Salvo (sem chave ainda).', !k);
+}
+function atualizaAiStatus() {
+  var ia = getIA(), on = iaConfigurada(), nm = nomeProvedor(ia.provider);
+  var s = document.getElementById('ai-status'), t = document.getElementById('ai-status-txt');
+  if (s) { s.className = 'ai-status ' + (on ? 'on' : 'off'); t.textContent = on ? ('IA: ' + nm + ' · ' + (ia.model || modeloPadrao(ia.provider))) : 'IA não configurada — vá em Ajustes'; }
+  var s2 = document.getElementById('aj-ai-status'), t2 = document.getElementById('aj-ai-status-txt');
+  if (s2) { s2.className = 'ai-status ' + (on ? 'on' : 'off'); t2.textContent = on ? 'Configurada' : 'Sem chave'; }
+}
+function testarIA() {
+  if (!iaConfigurada()) { toast('Cole a chave e clique em Salvar primeiro.', true); return; }
+  var btn = document.getElementById('btn-test-ia'), orig = btn.textContent;
+  btn.textContent = 'Testando…'; btn.disabled = true;
+  callAI('Responda apenas com a palavra OK.').then(function (txt) {
+    toast('Conexão OK — a IA respondeu: ' + String(txt || '').trim().slice(0, 20));
+  }).catch(function (e) {
+    toast('Falhou: ' + e.message, true);
+  }).then(function () { btn.textContent = orig; btn.disabled = false; });
+}
+
+/* ════════════════════════ IA — CHAMADA ════════════════════════ */
+async function callAI(promptText) {
+  var ia = getIA();
+  var model = ia.model || modeloPadrao(ia.provider);
+  if (!ia.key) throw new Error('chave de API não configurada');
+  if (ia.provider === 'claude') {
+    var r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': ia.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: model, max_tokens: 8192, messages: [{ role: 'user', content: promptText }] })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error((d.error && d.error.message) || ('HTTP ' + r.status));
+    return (d.content || []).map(function (c) { return c.text || ''; }).join('');
+  }
+  if (ia.provider === 'openai') {
+    var r2 = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Authorization': 'Bearer ' + ia.key },
+      body: JSON.stringify({ model: model, temperature: 0.6, messages: [{ role: 'user', content: promptText }] })
+    });
+    var d2 = await r2.json();
+    if (!r2.ok) throw new Error((d2.error && d2.error.message) || ('HTTP ' + r2.status));
+    return d2.choices[0].message.content;
+  }
+  // gemini (padrão)
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(ia.key);
+  var r3 = await fetch(url, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: promptText }] }], generationConfig: { temperature: 0.6, maxOutputTokens: 8192 } })
+  });
+  var d3 = await r3.json();
+  if (!r3.ok) throw new Error((d3.error && d3.error.message) || ('HTTP ' + r3.status));
+  if (d3.promptFeedback && d3.promptFeedback.blockReason) throw new Error('conteúdo bloqueado: ' + d3.promptFeedback.blockReason);
+  var cand = (d3.candidates || [])[0];
+  if (!cand || !cand.content) throw new Error('a IA não retornou conteúdo');
+  return (cand.content.parts || []).map(function (p) { return p.text || ''; }).join('');
+}
+
+/* ════════════════════════ ANEXOS / EXTRAÇÃO ════════════════════════ */
+var anexos = { portfolio: null, ata: null };
+function decodeHtml(s) { var t = document.createElement('textarea'); t.innerHTML = s; return t.value; }
+async function extractDocx(file) {
+  if (!window.JSZip) throw new Error('biblioteca de leitura não carregou');
+  var zip = await JSZip.loadAsync(file);
+  var f = zip.file('word/document.xml');
+  if (!f) throw new Error('DOCX inválido');
+  var xml = await f.async('string');
+  xml = xml.replace(/<w:tab[^>]*\/>/g, '\t').replace(/<\/w:p>/g, '\n');
+  return decodeHtml(xml.replace(/<[^>]+>/g, '')).replace(/\n{3,}/g, '\n\n').trim();
+}
+async function extractPdf(file) {
+  if (!window.pdfjsLib) throw new Error('leitor de PDF não carregou');
+  var buf = await file.arrayBuffer();
+  var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  var out = [], max = Math.min(pdf.numPages, 60);
+  for (var i = 1; i <= max; i++) {
+    var pg = await pdf.getPage(i);
+    var tc = await pg.getTextContent();
+    out.push(tc.items.map(function (it) { return it.str; }).join(' '));
+  }
+  if (pdf.numPages > max) out.push('[... ' + (pdf.numPages - max) + ' páginas a mais omitidas ...]');
+  return out.join('\n').replace(/[ \t]{3,}/g, ' ').trim();
+}
+async function extractText(file) {
+  var n = (file.name || '').toLowerCase();
+  if (n.endsWith('.txt')) return await file.text();
+  if (n.endsWith('.docx')) return await extractDocx(file);
+  if (n.endsWith('.pdf')) return await extractPdf(file);
+  if (n.endsWith('.doc')) throw new Error('.doc antigo não dá — salve como .docx ou PDF');
+  return await file.text();
+}
+async function anexar(tipo, file) {
+  if (!file) return;
+  var drop = document.getElementById('drop-' + tipo), ds = document.getElementById('ds-' + tipo);
+  ds.textContent = 'lendo…';
+  try {
+    var text = await extractText(file);
+    anexos[tipo] = { name: file.name, text: text };
+    drop.classList.add('ok');
+    var n = (text || '').replace(/\s+/g, ' ').trim().length;
+    ds.textContent = file.name + ' · ' + n.toLocaleString('pt-BR') + ' caracteres';
+    if (n < 120) toast('Li pouco texto de "' + file.name + '". Se for PDF de imagens, anexe a ata (texto) ou um portfólio em texto/Word.', true);
+  } catch (e) {
+    anexos[tipo] = null; drop.classList.remove('ok');
+    ds.textContent = 'erro ao ler'; toast('Não consegui ler ' + file.name + ': ' + e.message, true);
+  }
+}
+function limparAnexo(tipo) {
+  anexos[tipo] = null;
+  document.getElementById('drop-' + tipo).classList.remove('ok');
+  document.getElementById('ds-' + tipo).textContent = 'PDF, DOCX ou TXT';
+  var inp = document.getElementById('file-' + tipo); if (inp) inp.value = '';
+}
+
+/* ════════════════════════ GERAÇÃO DOS DOCUMENTOS ════════════════════════ */
+function buildGenPrompt(emp, sdrNome) {
+  var r = preencherTemplate(emp, sdrNome);
+  var partes = [r.txt,
+    '', '## DOCUMENTOS DE REFERÊNCIA (fonte para preencher — nunca cite que vieram de anexos)'];
+  if (anexos.portfolio && anexos.portfolio.text) partes.push('', '### PORTFÓLIO DA EMPRESA', anexos.portfolio.text);
+  if (anexos.ata && anexos.ata.text) partes.push('', '### ATA DA REUNIÃO', anexos.ata.text);
+  partes.push('', '## FORMATO DA SUA RESPOSTA (OBRIGATÓRIO)',
+    'Responda em português, APENAS com os dois documentos em Markdown, exatamente neste formato, sem nenhum texto antes ou depois e sem crases de código:',
+    '<<<MATERIAL>>>',
+    '# Material de Apoio — ' + (emp.nome || ''),
+    '(conteúdo completo do Script SDR em Markdown)',
+    '<<<CADENCIA>>>',
+    '# Cadência de Contato — ' + (emp.nome || ''),
+    '(conteúdo completo da Cadência em Markdown)',
+    '',
+    'Markdown: "## " para títulos de seção, "### " para subtítulos, "- " para listas, "**texto**" para negrito, "> " para falas/scripts. Não use tabelas nem crases.');
+  return partes.join('\n');
+}
+function parseGen(text) {
+  var t = String(text || '').replace(/```+[a-zA-Z]*\n?/g, '').replace(/```+/g, '');
+  var iM = t.indexOf('<<<MATERIAL>>>'), iC = t.indexOf('<<<CADENCIA>>>');
+  if (iM !== -1 && iC !== -1 && iC > iM) {
+    return { material: t.slice(iM + 14, iC).trim(), cadencia: t.slice(iC + 14).replace(/<<<END>>>/g, '').trim() };
+  }
+  return { material: t.trim(), cadencia: '' };
+}
+var GEN_STAGES = ['Lendo os anexos', 'Enviando para a IA', 'Montando os documentos'];
+function renderStages(active) {
+  var html = '<div class="card card-pad" style="margin-top:8px"><div class="card-title">Gerando <span class="ln"></span></div>';
+  GEN_STAGES.forEach(function (s, i) {
+    var done = i < active;
+    html += '<div class="gen-stage' + (done ? ' done' : '') + '">' +
+      (done ? '<span class="sp" style="background:var(--green);border:none"></span>' : i === active ? '<span class="sp"></span>' : '<span class="sp" style="opacity:.25"></span>') +
+      '<span>' + s + '</span></div>';
+  });
+  document.getElementById('gen-area').innerHTML = html + '</div>';
+}
+function gerarDocumentos() {
+  var emp = empresas.find(function (e) { return e.id === gerarEmpresaId; });
+  if (!emp) { toast('Escolha uma empresa primeiro.', true); return; }
+  if (!iaConfigurada()) { toast('Configure a IA em Ajustes (chave grátis do Gemini).', true); go('ajustes'); return; }
+  if (!anexos.portfolio && !anexos.ata) { toast('Anexe ao menos a ata ou o portfólio.', true); return; }
+  var sel = document.getElementById('gerar-sdr');
+  var s = sdrs.find(function (x) { return x.id === sel.value; });
+  var sdrNome = s ? s.nome : '';
+  var btn = document.getElementById('btn-gerar');
+  btn.classList.add('loading');
+  document.getElementById('doc-area').innerHTML = '';
+  renderStages(0);
+  var prompt;
+  try { prompt = buildGenPrompt(emp, sdrNome); } catch (e) { btn.classList.remove('loading'); toast('Erro: ' + e.message, true); return; }
+  renderStages(1);
+  callAI(prompt).then(function (txt) {
+    renderStages(2);
+    var docs = parseGen(txt);
+    if (!docs.material) throw new Error('a IA não respondeu no formato esperado — tente de novo');
+    var item = { id: uid(), ts: Date.now(), sdr: sdrNome, empresaId: emp.id, empresaNome: emp.nome, tipo: 'docs', material: docs.material, cadencia: docs.cadencia };
+    historico.unshift(item);
+    if (historico.length > 300) historico.length = 300;
+    saveHistorico();
+    btn.classList.remove('loading');
+    document.getElementById('gen-area').innerHTML = '';
+    renderDocumentosResult(item);
+    atualizaSidebarStats();
+    toast('Documentos gerados e salvos no histórico!');
+  }).catch(function (e) {
+    btn.classList.remove('loading');
+    document.getElementById('gen-area').innerHTML = '';
+    toast('Erro ao gerar: ' + e.message, true);
+  });
+}
+function copiarPromptManual() { gerarMaterial(); }
+
+/* renderização markdown → html (preview) */
+function mdInline(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); }
+function mdToHtml(md) {
+  var lines = String(md || '').split('\n'), html = '', ul = false;
+  function closeUl() { if (ul) { html += '</ul>'; ul = false; } }
+  lines.forEach(function (ln) {
+    if (/^### /.test(ln)) { closeUl(); html += '<h3>' + mdInline(ln.slice(4)) + '</h3>'; }
+    else if (/^## /.test(ln)) { closeUl(); html += '<h2>' + mdInline(ln.slice(3)) + '</h2>'; }
+    else if (/^# /.test(ln)) { closeUl(); html += '<h1>' + mdInline(ln.slice(2)) + '</h1>'; }
+    else if (/^\s*[-*] /.test(ln)) { if (!ul) { html += '<ul>'; ul = true; } html += '<li>' + mdInline(ln.replace(/^\s*[-*] /, '')) + '</li>'; }
+    else if (/^> /.test(ln)) { closeUl(); html += '<blockquote>' + mdInline(ln.slice(2)) + '</blockquote>'; }
+    else if (!ln.trim()) { closeUl(); }
+    else { closeUl(); html += '<p>' + mdInline(ln) + '</p>'; }
+  });
+  closeUl();
+  return html;
+}
+function renderDocumentosResult(item) {
+  document.getElementById('doc-area').innerHTML =
+    '<div class="doc-wrap" id="doc-atual">' +
+      '<div class="doc-head">' +
+        '<div><div class="t">Documentos prontos — ' + esc(item.empresaNome) + '</div>' +
+        '<div class="m">Gerado por ' + esc(item.sdr || '—') + ' · ' + dataFmt(item.ts) + ' · salvo no histórico</div></div>' +
+        '<span class="badge bg-green">2 documentos ✓</span>' +
+      '</div>' +
+      '<div class="doc-tabs">' +
+        '<button class="doc-tab on" onclick="trocaTab(this,\'material\')">Material de Apoio</button>' +
+        '<button class="doc-tab" onclick="trocaTab(this,\'cadencia\')">Cadência de Contato</button>' +
+      '</div>' +
+      '<div class="sheet">' +
+        '<div class="sheet-id"><img src="' + LOGO + '" alt=""><div><div class="a">MAXIMOS · Material Comercial SDR</div><div class="b">' + esc(item.empresaNome) + '</div></div><div class="right">' + dataFmt(item.ts) + '</div></div>' +
+        '<div class="sheet-md" id="md-material">' + mdToHtml(item.material) + '</div>' +
+        '<div class="sheet-md" id="md-cadencia" style="display:none">' + mdToHtml(item.cadencia || '_(vazio)_') + '</div>' +
+        '<div class="doc-actions">' +
+          '<button class="btn btn-pri" onclick="baixarDocx(\'' + item.id + '\',\'material\')"><svg viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 12l4 4 4-4"/></svg>Material (.docx)</button>' +
+          '<button class="btn btn-pri" onclick="baixarDocx(\'' + item.id + '\',\'cadencia\')"><svg viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12M8 12l4 4 4-4"/></svg>Cadência (.docx)</button>' +
+          '<span class="sep"></span>' +
+          '<button class="btn btn-sm" onclick="copiarDoc(\'' + item.id + '\')">Copiar texto</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.getElementById('doc-atual').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function trocaTab(btn, which) {
+  var p = btn.parentNode; p.querySelectorAll('.doc-tab').forEach(function (b) { b.classList.remove('on'); });
+  btn.classList.add('on');
+  document.getElementById('md-material').style.display = which === 'material' ? 'block' : 'none';
+  document.getElementById('md-cadencia').style.display = which === 'cadencia' ? 'block' : 'none';
+}
+function copiarDoc(id) {
+  var g = geracaoPorId(id); if (!g) return;
+  copiarTexto((g.material || '') + '\n\n' + (g.cadencia || ''), 'Texto dos 2 documentos copiado!');
+}
+
+/* ════════════════════════ MARKDOWN → .DOCX (JSZip) ════════════════════════ */
+function xmlEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function mdRuns(text, italic) {
+  var parts = String(text).split(/(\*\*)/), bold = false, out = '';
+  parts.forEach(function (p) {
+    if (p === '**') { bold = !bold; return; }
+    if (!p) return;
+    var rpr = (bold || italic) ? ('<w:rPr>' + (bold ? '<w:b/>' : '') + (italic ? '<w:i/>' : '') + '</w:rPr>') : '';
+    out += '<w:r>' + rpr + '<w:t xml:space="preserve">' + xmlEsc(p) + '</w:t></w:r>';
+  });
+  return out || '<w:r><w:t/></w:r>';
+}
+function mdToBodyXml(md) {
+  var lines = String(md || '').split('\n'), xml = '';
+  lines.forEach(function (ln) {
+    if (/^# /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>' + mdRuns(ln.slice(2), false) + '</w:p>';
+    else if (/^## /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="SecHead"/></w:pPr>' + mdRuns(ln.slice(3), false) + '</w:p>';
+    else if (/^### /.test(ln)) xml += '<w:p><w:pPr><w:spacing w:before="160" w:after="40"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="1A3A5C"/></w:rPr><w:t xml:space="preserve">' + xmlEsc(ln.slice(4)) + '</w:t></w:r></w:p>';
+    else if (/^\s*[-*] /.test(ln)) xml += '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>' + mdRuns(ln.replace(/^\s*[-*] /, ''), false) + '</w:p>';
+    else if (/^> /.test(ln)) xml += '<w:p><w:pPr><w:ind w:left="360"/><w:spacing w:after="160"/></w:pPr>' + mdRuns(ln.slice(2), true) + '</w:p>';
+    else if (!ln.trim()) xml += '<w:p/>';
+    else xml += '<w:p>' + mdRuns(ln, false) + '</w:p>';
+  });
+  return xml;
+}
+var DOCX_STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="120" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="0" w:after="40"/></w:pPr><w:rPr><w:b/><w:color w:val="1A3A5C"/><w:sz w:val="40"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="SecHead"><w:name w:val="SecHead"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="280" w:after="120"/><w:pBdr><w:bottom w:val="single" w:sz="8" w:space="3" w:color="1A3A5C"/></w:pBdr></w:pPr><w:rPr><w:b/><w:color w:val="1A3A5C"/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="360"/></w:pPr></w:style></w:styles>';
+var DOCX_NUM = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="hybridMultilevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:hint="default"/></w:rPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+var DOCX_CT = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>';
+var DOCX_RELS_ROOT = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+var DOCX_RELS_DOC = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>';
+var DOCX_FOOTER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/><w:pBdr><w:top w:val="single" w:sz="6" w:space="4" w:color="999999"/></w:pBdr><w:spacing w:before="60" w:after="0"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="20"/></w:rPr><w:t>Propriedade Máximos</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="777777"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">Se impresso, é considerado válido somente quando for cópia controlada – Reprodução Proibida</w:t></w:r></w:p></w:ftr>';
+function docxHeader(comp, title) {
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblBorders><w:bottom w:val="single" w:sz="6" w:space="0" w:color="C8CBC3"/></w:tblBorders><w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="0" w:noVBand="0"/></w:tblPr><w:tblGrid><w:gridCol w:w="3200"/><w:gridCol w:w="3826"/><w:gridCol w:w="2000"/></w:tblGrid><w:tr>' +
+    '<w:tc><w:tcPr><w:tcW w:w="3200" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="1A3A5C"/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">' + xmlEsc(comp) + '</w:t></w:r></w:p></w:tc>' +
+    '<w:tc><w:tcPr><w:tcW w:w="3826" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:rPr><w:color w:val="5D605A"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">' + xmlEsc(title) + '</w:t></w:r></w:p></w:tc>' +
+    '<w:tc><w:tcPr><w:tcW w:w="2000" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:rPr><w:color w:val="5D605A"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">Página </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:rPr><w:color w:val="5D605A"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve"> de </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> NUMPAGES </w:instrText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:tc>' +
+    '</w:tr></w:tbl><w:p><w:pPr><w:spacing w:before="0" w:after="0"/><w:rPr><w:sz w:val="8"/></w:rPr></w:pPr></w:p></w:hdr>';
+}
+function docxDocument(bodyXml) {
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>' + bodyXml +
+    '<w:sectPr><w:headerReference w:type="default" r:id="rId3"/><w:footerReference w:type="default" r:id="rId4"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1418" w:header="709" w:footer="709" w:gutter="0"/><w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr></w:body></w:document>';
+}
+async function mdToDocxBlob(comp, title, md) {
+  if (!window.JSZip) throw new Error('biblioteca .docx não carregou');
+  var zip = new JSZip();
+  zip.file('[Content_Types].xml', DOCX_CT);
+  zip.folder('_rels').file('.rels', DOCX_RELS_ROOT);
+  var w = zip.folder('word');
+  w.file('document.xml', docxDocument(mdToBodyXml(md)));
+  w.folder('_rels').file('document.xml.rels', DOCX_RELS_DOC);
+  w.file('styles.xml', DOCX_STYLES);
+  w.file('numbering.xml', DOCX_NUM);
+  w.file('header1.xml', docxHeader(comp, title));
+  w.file('footer1.xml', DOCX_FOOTER);
+  return await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+function baixarDocx(id, which) {
+  var g = geracaoPorId(id); if (!g) return;
+  var md = which === 'cadencia' ? g.cadencia : g.material;
+  var titulo = (which === 'cadencia' ? 'Cadência de Contato — ' : 'Material de Apoio — ') + g.empresaNome;
+  if (!md) { toast('Esse documento está vazio.', true); return; }
+  mdToDocxBlob(g.empresaNome, titulo, md).then(function (blob) {
+    var fn = (which === 'cadencia' ? 'cadencia' : 'material') + '-sdr-' + slug(g.empresaNome) + '.docx';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = fn;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+    toast('Baixado: ' + fn);
+  }).catch(function (e) { toast('Erro ao montar .docx: ' + e.message, true); });
 }
 
 /* ════════════════════════ PÁGINA EMPRESAS ════════════════════════ */
@@ -1694,16 +2120,34 @@ function verGeracao(id) {
   var g = geracaoPorId(id);
   if (!g) return;
   document.getElementById('modal-ver-t').textContent = g.empresaNome + ' · ' + dataFmt(g.ts) + ' · ' + (g.sdr || '—');
-  document.getElementById('modal-ver-b').innerHTML =
-    '<div class="sheet" style="border:none;border-radius:0;box-shadow:none">' +
-      '<pre style="max-height:58vh">' + highlightPrompt(g.txt) + '</pre>' +
+  var body;
+  if (g.tipo === 'docs' || g.material) {
+    body =
+      '<div style="padding:16px 24px 0"><div class="doc-tabs">' +
+        '<button class="doc-tab on" onclick="trocaTab(this,\'material\')">Material de Apoio</button>' +
+        '<button class="doc-tab" onclick="trocaTab(this,\'cadencia\')">Cadência de Contato</button>' +
+      '</div></div>' +
+      '<div class="sheet-md" id="md-material" style="max-height:54vh">' + mdToHtml(g.material) + '</div>' +
+      '<div class="sheet-md" id="md-cadencia" style="display:none;max-height:54vh">' + mdToHtml(g.cadencia || '_(vazio)_') + '</div>' +
       '<div class="doc-actions">' +
-        '<button class="btn btn-pri" onclick="copiarGeracao(\'' + g.id + '\', this)">' +
-          '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copiar prompt</button>' +
-        '<button class="btn" onclick="baixarTxt(\'' + g.id + '\')">.txt</button>' +
-        '<button class="btn" onclick="baixarDoc(\'' + g.id + '\')">.doc</button>' +
-      '</div>' +
-    '</div>';
+        '<button class="btn btn-pri" onclick="baixarDocx(\'' + g.id + '\',\'material\')">Material (.docx)</button>' +
+        '<button class="btn btn-pri" onclick="baixarDocx(\'' + g.id + '\',\'cadencia\')">Cadência (.docx)</button>' +
+        '<span class="sep"></span>' +
+        '<button class="btn btn-sm" onclick="copiarDoc(\'' + g.id + '\')">Copiar texto</button>' +
+      '</div>';
+  } else {
+    body =
+      '<div class="sheet" style="border:none;border-radius:0;box-shadow:none">' +
+        '<pre style="max-height:58vh">' + highlightPrompt(g.txt) + '</pre>' +
+        '<div class="doc-actions">' +
+          '<button class="btn btn-pri" onclick="copiarGeracao(\'' + g.id + '\', this)">' +
+            '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copiar prompt</button>' +
+          '<button class="btn" onclick="baixarTxt(\'' + g.id + '\')">.txt</button>' +
+          '<button class="btn" onclick="baixarDoc(\'' + g.id + '\')">.doc</button>' +
+        '</div>' +
+      '</div>';
+  }
+  document.getElementById('modal-ver-b').innerHTML = body;
   document.getElementById('modal-ver').classList.add('on');
 }
 function fecharModal() {
@@ -1713,10 +2157,11 @@ function regerar(id) {
   var g = geracaoPorId(id);
   if (!g) return;
   var emp = empresas.find(function (e) { return e.id === g.empresaId; });
-  if (!emp) { toast('Essa empresa não existe mais no cadastro — use "Ver" para copiar a versão antiga.', true); return; }
+  if (!emp) { toast('Essa empresa não existe mais no cadastro — use "Ver" para reabrir a versão salva.', true); return; }
   gerarEmpresaId = emp.id;
   go('gerar');
-  setTimeout(function () { gerarMaterial(); }, 80);
+  if (g.tipo === 'docs' || g.material) { toast('Anexe o portfólio + a ata novamente e clique em Gerar documentos.', true); }
+  else setTimeout(function () { gerarMaterial(); }, 80);
 }
 function limparHistorico() {
   if (!historico.length) { toast('O histórico já está vazio.'); return; }
@@ -1740,6 +2185,7 @@ function renderAjustes() {
   leg.innerHTML = Object.keys(PLACEHOLDERS).map(function (k) {
     return '<span class="ph-tag" title="' + esc(PLACEHOLDERS[k]) + ' — clique para inserir" onclick="inserirPh(\'' + k + '\')">{{' + k + '}}</span>';
   }).join('');
+  renderIAConfig();
 }
 function inserirPh(k) {
   var ta = document.getElementById('tpl-edit');
@@ -1922,6 +2368,18 @@ function rodarTestes() {
   t('slug() limpa nome de arquivo', slug('Açõés & Cia!') === 'acoes-cia');
   t('maskCNPJ formata 14 dígitos', (function () { var o = { value: '12345678000190' }; maskCNPJ(o); return o.value === '12.345.678/0001-90'; })());
   t('uid() gera ids únicos', uid() !== uid());
+  var pg = parseGen('lixo\n<<<MATERIAL>>>\n# Mat\n- a\n<<<CADENCIA>>>\n# Cad\ntexto');
+  t('parseGen separa os 2 documentos', pg.material.indexOf('# Mat') !== -1 && pg.cadencia.indexOf('# Cad') !== -1);
+  t('parseGen remove crases de código', parseGen('```markdown\n<<<MATERIAL>>>\nX\n<<<CADENCIA>>>\nY\n```').material.indexOf('`') === -1);
+  var bx = mdToBodyXml('# T\n## Seção\n- item **forte**\n> fala');
+  t('mdToBodyXml gera Title/SecHead/bullet/negrito', bx.indexOf('w:val="Title"') !== -1 && bx.indexOf('w:val="SecHead"') !== -1 && bx.indexOf('w:numId') !== -1 && bx.indexOf('<w:b/>') !== -1);
+  t('mdToHtml gera h2/li/strong', (function () { var h = mdToHtml('## S\n- a **b**'); return h.indexOf('<h2>') !== -1 && h.indexOf('<li>') !== -1 && h.indexOf('<strong>') !== -1; })());
+  t('xmlEsc neutraliza < e &', xmlEsc('a<b&c') === 'a&lt;b&amp;c');
+  t('modeloPadrao por provedor', modeloPadrao('gemini').indexOf('gemini') === 0 && modeloPadrao('claude').indexOf('claude') === 0);
+  anexos.portfolio = { name: 'p.txt', text: 'PORTA azul' }; anexos.ata = { name: 'a.txt', text: 'reuniao xyz' };
+  var gp = buildGenPrompt(emp, 'Maria Silva');
+  anexos.portfolio = null; anexos.ata = null;
+  t('buildGenPrompt inclui anexos e formato', gp.indexOf('PORTA azul') !== -1 && gp.indexOf('reuniao xyz') !== -1 && gp.indexOf('<<<MATERIAL>>>') !== -1 && gp.indexOf('<<<CADENCIA>>>') !== -1);
   var bkp = JSON.parse(JSON.stringify({ sistema: 'MxSDR', versao: 1, empresas: [emp], sdrs: [], historico: [] }));
   t('Backup serializa/parseia', bkp.empresas[0].nome === 'Empresa Teste Ltda');
   t('Template padrão tem placeholders essenciais',
@@ -1944,6 +2402,18 @@ function rodarTestes() {
   var fav = document.createElement('link');
   fav.rel = 'icon'; fav.href = LOGO;
   document.head.appendChild(fav);
+
+  if (window.pdfjsLib) { try { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } catch (e) {} }
+  ['portfolio', 'ata'].forEach(function (tp) {
+    var d = document.getElementById('drop-' + tp);
+    if (!d) return;
+    d.addEventListener('dragover', function (e) { e.preventDefault(); d.classList.add('drag'); });
+    d.addEventListener('dragleave', function () { d.classList.remove('drag'); });
+    d.addEventListener('drop', function (e) {
+      e.preventDefault(); d.classList.remove('drag');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) anexar(tp, e.dataTransfer.files[0]);
+    });
+  });
 
   var p = perfilAtual();
   if (p) {

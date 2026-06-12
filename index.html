@@ -1081,6 +1081,7 @@ tbody tr:hover { background: #fafbf8; }
                   <label class="fl">Provedor</label>
                   <select id="ai-provider" onchange="onProviderChange()">
                     <option value="gemini">Google Gemini (grátis)</option>
+                    <option value="deepseek">DeepSeek</option>
                     <option value="claude">Claude / Anthropic</option>
                     <option value="openai">OpenAI / ChatGPT</option>
                   </select>
@@ -1642,12 +1643,13 @@ var RELAY_URL = '';
 /* EMBED_KEY_B64: chave central do escritório (Gemini), em base64 para não ficar "crua"
    no código. Preenchida uma vez pelo suporte → toda a equipe usa sem configurar nada. */
 var EMBED_KEY_B64 = 'QVEuQWI4Uk42S0R1MW9vdzJQUmpxUHBGZTVRc3Azc0JiMHlqekdJNWVBVnpNZ1ZQVDVfNGc=';
+var EMBED_PROVIDER = 'gemini';
 function getIA() { return lsGet('sdrmx_ai', { provider: 'gemini', key: '', model: '', relay: '' }); }
 function effectiveRelay() { var ia = getIA(); return ((ia.relay || '').trim()) || RELAY_URL; }
 function embedKey() { try { return EMBED_KEY_B64 ? atob(EMBED_KEY_B64) : ''; } catch (e) { return ''; } }
 function effectiveKey() { return (getIA().key || '').trim() || embedKey(); }
-function modeloPadrao(p) { return p === 'claude' ? 'claude-sonnet-4-6' : p === 'openai' ? 'gpt-4o-mini' : 'gemini-2.5-flash'; }
-function nomeProvedor(p) { return { gemini: 'Gemini', claude: 'Claude', openai: 'OpenAI' }[p] || p; }
+function modeloPadrao(p) { return p === 'claude' ? 'claude-sonnet-4-6' : p === 'openai' ? 'gpt-4o-mini' : p === 'deepseek' ? 'deepseek-chat' : 'gemini-2.5-flash'; }
+function nomeProvedor(p) { return { gemini: 'Gemini', claude: 'Claude', openai: 'OpenAI', deepseek: 'DeepSeek' }[p] || p; }
 function iaConfigurada() { return !!(effectiveRelay() || effectiveKey()); }
 function onProviderChange() {
   var p = document.getElementById('ai-provider').value;
@@ -1714,7 +1716,7 @@ async function callAI(promptText) {
   var ia = getIA();
   var key = (ia.key || '').trim();
   var provider = ia.provider || 'gemini';
-  if (!key && embedKey()) { key = embedKey(); provider = 'gemini'; }   // chave central do escritório
+  if (!key && embedKey()) { key = embedKey(); provider = EMBED_PROVIDER; }   // chave central do escritório
   if (!key) throw new Error('IA não configurada (sem chave nem relay)');
   var model = ia.model || modeloPadrao(provider);
   if (provider === 'claude') {
@@ -1727,11 +1729,12 @@ async function callAI(promptText) {
     if (!r.ok) throw new Error((d.error && d.error.message) || ('HTTP ' + r.status));
     return (d.content || []).map(function (c) { return c.text || ''; }).join('');
   }
-  if (provider === 'openai') {
-    var r2 = await fetch('https://api.openai.com/v1/chat/completions', {
+  if (provider === 'openai' || provider === 'deepseek') {
+    var base = provider === 'deepseek' ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+    var r2 = await fetch(base, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({ model: model, temperature: 0.6, messages: [{ role: 'user', content: promptText }] })
+      body: JSON.stringify({ model: model, temperature: 0.6, max_tokens: 8192, messages: [{ role: 'user', content: promptText }] })
     });
     var d2 = await r2.json();
     if (!r2.ok) throw new Error((d2.error && d2.error.message) || ('HTTP ' + r2.status));

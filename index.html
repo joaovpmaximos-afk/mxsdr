@@ -516,9 +516,9 @@ textarea { resize: vertical; min-height: 84px; line-height: 1.55; }
 .afile .aic svg { width: 13px; height: 13px; stroke: var(--green-deep); fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .afile .aic.err { background: var(--red-bg); }
 .afile .aic.err svg { stroke: var(--red); }
-.afile .anm { flex: 1; min-width: 0; }
-.afile .anm .t { font-size: 12.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.afile .anm .s { font-size: 10.5px; color: var(--ink3); }
+.afile .anm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.afile .anm .t { display: block; max-width: 100%; font-size: 12.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.afile .anm .s { display: block; font-size: 10.5px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .afile .anm .s.warn { color: var(--amber); }
 .afile .arm { border: none; background: none; color: var(--ink3); cursor: pointer; font-size: 14px; padding: 2px 4px; line-height: 1; flex-shrink: 0; }
 .afile .arm:hover { color: var(--red); }
@@ -1719,7 +1719,7 @@ function renderEmpPick() {
       return '<div class="emp-pick' + (e.id === gerarEmpresaId ? ' sel' : '') + '" onclick="selEmpresa(\'' + e.id + '\')">' +
         '<span class="check"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>' +
         '<div class="nm">' + esc(e.nome) + '</div>' +
-        '<div class="seg">' + esc(e.cnpj ? e.cnpj : 'sem CNPJ') + (gers ? ' · ' + gers + ' geração' + (gers === 1 ? '' : 'ões') : '') + '</div>' +
+        '<div class="seg">' + esc(e.cnpj ? e.cnpj : 'sem CNPJ') + (gers ? ' · ' + gers + (gers === 1 ? ' geração' : ' gerações') : '') + '</div>' +
         '</div>';
     }).join('') || '<div class="hint" style="padding:14px 4px">Nenhuma empresa encontrada para essa busca.</div>';
   }
@@ -1940,6 +1940,36 @@ async function callWithKey(provider, key, model, promptText) {
   return (cand.content.parts || []).map(function (p) { return p.text || ''; }).join('');
 }
 function embedFallbackKey() { try { return (typeof EMBED_KEY_FALLBACK_B64 !== 'undefined' && EMBED_KEY_FALLBACK_B64) ? atob(EMBED_KEY_FALLBACK_B64) : ''; } catch (e) { return ''; } }
+function erroTransitorio(e) {
+  var m = String((e && e.message) || e || '').toLowerCase();
+  return m.indexOf('high demand') !== -1 || m.indexOf('overload') !== -1 || m.indexOf('try again') !== -1 ||
+    m.indexOf('unavailable') !== -1 || m.indexOf('resource_exhausted') !== -1 || m.indexOf('quota') !== -1 ||
+    m.indexOf('rate limit') !== -1 || m.indexOf('429') !== -1 || m.indexOf('503') !== -1 || m.indexOf('timeout') !== -1 ||
+    m.indexOf('failed to fetch') !== -1;
+}
+function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+/* tenta cada item da sequência; erro transitório espera e segue, erro permanente pula
+   tentativas idênticas (mesmo provedor+modelo) e vai direto para a próxima alternativa */
+async function tentarSequencia(seq, promptText) {
+  var ultimo = null;
+  for (var i = 0; i < seq.length; i++) {
+    var t = seq[i];
+    try { return await callWithKey(t.provider, t.key, t.model, promptText); }
+    catch (e) {
+      ultimo = e;
+      if (!erroTransitorio(e)) {
+        var j = i + 1;
+        while (j < seq.length && seq[j].provider === t.provider && seq[j].model === t.model) j++;
+        if (j >= seq.length) break;
+        i = j - 1;
+        continue;
+      }
+      if (i < seq.length - 1) await esperar(seq[i + 1].espera || 2000);
+    }
+  }
+  if (erroTransitorio(ultimo)) throw new Error('A IA está sobrecarregada neste momento. Espere ~1 minuto e clique em Gerar de novo.');
+  throw (ultimo || new Error('falha na IA'));
+}
 async function callAI(promptText) {
   var relay = effectiveRelay();
   if (relay) return await callRelay(relay, promptText);
@@ -1947,18 +1977,24 @@ async function callAI(promptText) {
   var userKey = (ia.key || '').trim();
   if (userKey) {
     var up = ia.provider || 'gemini';
-    return await callWithKey(up, userKey, ia.model || modeloPadrao(up), promptText);
+    var um = ia.model || modeloPadrao(up);
+    return await tentarSequencia([
+      { provider: up, key: userKey, model: um },
+      { provider: up, key: userKey, model: um, espera: 3000 },
+      { provider: up, key: userKey, model: um, espera: 6000 }
+    ], promptText);
   }
-  // chave central do escritório, com reserva automática
+  // chave central do escritório: principal + retentativas + modelos reserva
   if (embedKey()) {
-    try {
-      return await callWithKey(EMBED_PROVIDER, embedKey(), modeloPadrao(EMBED_PROVIDER), promptText);
-    } catch (e) {
-      if (embedFallbackKey() && typeof EMBED_PROVIDER_FALLBACK !== 'undefined' && EMBED_PROVIDER_FALLBACK) {
-        return await callWithKey(EMBED_PROVIDER_FALLBACK, embedFallbackKey(), modeloPadrao(EMBED_PROVIDER_FALLBACK), promptText);
-      }
-      throw e;
+    var seq = [{ provider: EMBED_PROVIDER, key: embedKey(), model: modeloPadrao(EMBED_PROVIDER) }];
+    var fb = embedFallbackKey();
+    if (fb && typeof EMBED_PROVIDER_FALLBACK !== 'undefined' && EMBED_PROVIDER_FALLBACK) {
+      seq.push({ provider: EMBED_PROVIDER_FALLBACK, key: fb, model: 'gemini-2.5-flash', espera: 1500 });
+      seq.push({ provider: EMBED_PROVIDER_FALLBACK, key: fb, model: 'gemini-2.5-flash', espera: 6000 });
+      seq.push({ provider: EMBED_PROVIDER_FALLBACK, key: fb, model: 'gemini-2.5-flash-lite', espera: 2500 });
+      seq.push({ provider: EMBED_PROVIDER_FALLBACK, key: fb, model: 'gemini-flash-latest', espera: 2500 });
     }
+    return await tentarSequencia(seq, promptText);
   }
   throw new Error('IA não configurada (sem chave nem relay)');
 }
@@ -2449,7 +2485,7 @@ function renderEmpresas() {
         '<div class="ct td-mono" style="font-size:11.5px">' + esc(e.cnpj ? e.cnpj : 'sem CNPJ') + '</div></div>' +
       '</div>' +
       '<div class="tags">' +
-        (gers ? '<span class="badge bg-blue">' + gers + ' geração' + (gers === 1 ? '' : 'ões') + '</span>' : '<span class="badge bg-gray">sem gerações</span>') +
+        (gers ? '<span class="badge bg-blue">' + gers + (gers === 1 ? ' geração' : ' gerações') + '</span>' : '<span class="badge bg-gray">sem gerações</span>') +
       '</div>' +
       '<div class="acts">' +
         '<button class="btn btn-pri btn-sm" onclick="gerarCom(\'' + e.id + '\')">' +
@@ -2896,6 +2932,7 @@ function rodarTestes() {
   var bkp = JSON.parse(JSON.stringify({ sistema: 'MxSDR', versao: 1, empresas: [emp], sdrs: [], historico: [] }));
   t('Backup serializa/parseia', bkp.empresas[0].nome === 'Empresa Teste Ltda');
   t('isUuid valida certo', isUuid('de24613d-a0e9-45ac-9084-84c2140e3a7b') === true && isUuid('abc123') === false && isUuid(uid()) === true);
+  t('erroTransitorio classifica certo', erroTransitorio(new Error('This model is currently experiencing high demand')) === true && erroTransitorio(new Error('429 rate limit')) === true && erroTransitorio(new Error('Insufficient Balance')) === false && erroTransitorio(new Error('Authentication Fails')) === false);
   var eDb = empFromDb({ id: 'x-id', nome: 'Acme', cnpj: '11', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z' });
   t('empFromDb mapeia campos', eDb.nome === 'Acme' && eDb.cnpj === '11' && eDb.createdAt === '2026-01-01T00:00:00Z');
   var hDb = histToDb({ id: 'de24613d-a0e9-45ac-9084-84c2140e3a7b', ts: 1750000000000, sdr: 'Ana', empresaId: 'nao-uuid', empresaNome: 'X', material: 'M', cadencia: 'C', chat: [{ role: 'user', text: 'oi' }] });
